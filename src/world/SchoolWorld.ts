@@ -258,6 +258,7 @@ export default class SchoolWorld extends BaseWorld {
 
     override update(time: number, delta: number): void {
         super.update(time, delta); // Y-sort depth
+        this.player.tick(delta);
 
         for (const npc of this.npcs) {
             npc.tick(time, delta);

@@ -4,10 +4,10 @@ import VirtualJoystic from "phaser3-rex-plugins/plugins/virtualjoystick.js"
 import type { AnalogStick } from "../entities/Player";
 
 // * Layout Constraint
-const STICK_X = 100;
+const STICK_X_OFFSET = 100;
 const STICK_Y_OFFSET = 100;
 const STICK_RADIUS = 50;
-const FORCE_MIN = 50;
+const FORCE_MIN = 10;
 
 // * Virtual analog
 export class VirtualAnalog implements AnalogStick {
@@ -18,6 +18,7 @@ export class VirtualAnalog implements AnalogStick {
 
 
     constructor(scene: Phaser.Scene, worldRoot: Phaser.GameObjects.Container) {
+        const stickX = scene.scale.width - STICK_X_OFFSET;
         const stickY = scene.scale.height - STICK_Y_OFFSET;
         this._scene = scene;
 
@@ -25,7 +26,7 @@ export class VirtualAnalog implements AnalogStick {
         this._uiCamera.setScroll(0, 0);
         this._uiCamera.ignore(worldRoot);
         this.Joystick = new VirtualJoystic(scene, {
-            x: STICK_X,
+            x: stickX,
             y: stickY,
             radius: STICK_RADIUS,
             forceMin: FORCE_MIN,
