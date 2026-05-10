@@ -1,7 +1,4 @@
 import 'phaser';
-import MeadowWorld from './world/MeadowWorld';
-import HomeWorld from './world/HomeWorld';
-import BedroomWorld from './world/BedroomWorld';
 import SchoolWorld from './world/SchoolWorld';
 
 const config: Phaser.Types.Core.GameConfig = {
