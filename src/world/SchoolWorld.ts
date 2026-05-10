@@ -1,33 +1,15 @@
-/**
- * SchoolWorld.ts
- * src/world/SchoolWorld.ts
- *
- * World pertama Geo Adventure — Halaman Sekolah SDN, grid 13×13.
- *
- * EPICS yang diimplementasikan di sini:
- *   TICKET-01  · Tilemap 13×13 (grid, tile types, isTroughable)
- *   TICKET-02  · Asset preload
- *   TICKET-04  · Proximity detection via NpcProximitySystem
- *   TICKET-05  · Spawn 3 NPC (Pak Satpam, Pak Guru, Bu Kantin)
- *
- * YANG TIDAK ADA DI SINI:
- *   Dialog / QuestionUI  → listener EventBus di scene terpisah
- *   GameState / scoring  → TICKET-10
- *   Rain effect          → TICKET-11
- */
-
 import BaseWorld from './BaseWorld';
 import { Player } from '../entities/Player';
 import { Npc } from '../entities/Npc';
 import { NpcProximitySystem } from '../entities/NpcProximitySystem';
 import { VirtualAnalog } from '../core/VirtualAnalog';
-import type { TileNode, MapConfig } from './WorldTypes';
+import { TileTriggerSystem, type TileTriggerRegistry } from '../core/TileTriggerSystem';
+import type { TileNode } from './WorldTypes';
 
 // =============================================================================
 // TILE MAP — 13×13
 // =============================================================================
 // Baris = ty (atas → bawah), Kolom = tx (kiri → kanan)
-// Referensi layout dari GDD:
 //
 //   W W W W W W W W W W W W W
 //   W G G G G G G G G G G G W
@@ -35,7 +17,7 @@ import type { TileNode, MapConfig } from './WorldTypes';
 //   W G T G G K K G G G G G W
 //   W G G G G K K G G G G G W
 //   W G G G P P P P P G G G W
-//   ! G G G P L L L P G G G W   ← tx=0 adalah '!' (NPC tile, walkable)
+//   ! G G G P L L L P G G G W   ← tx=0 = '!' (NPC tile, walkable)
 //   W G G G P L ? L P G G G W
 //   W G C C P L L L P G G G W
 //   W G C C G G G G G G G G W
@@ -60,28 +42,148 @@ const SCHOOL_MAP: string[][] = [
     /* ty12 */['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
 ];
 
-// ─── Tile type helpers ────────────────────────────────────────────────────────
+/** Cell default kalau lookup ke SCHOOL_MAP miss (out-of-bounds, typo, dll). */
+const DEFAULT_CELL = 'G';
 
-/** Tile yang tidak bisa dilewati player. */
-const NON_WALKABLE = new Set(['W', 'T', 'K', 'C', 'R']);
+// =============================================================================
+// TILE DEFINITIONS — SINGLE SOURCE OF TRUTH
+// =============================================================================
+//
+// Setiap char di SCHOOL_MAP didefinisikan di sini. Tambah tile type baru?
+// Cukup tambah satu entry — preload, walkability, dekorasi auto ter-handle.
+//
+// FIELD GUIDE:
+//   texture    — Phaser texture key (bebas, tapi konsisten dengan assetPath)
+//   assetPath  — path file PNG; auto-loaded di preload() dengan dedupe
+//   walkable   — apakah player bisa lewat
+//   decoration — opsional, sprite yang di-overlay di atas ground tile
+//                (pohon, sumur, dll). Co-located biar gampang tiling.
 
-/** Tile yang walkable meski char-nya bukan 'G'. */
-const FORCE_WALKABLE = new Set(['!', '?', 'S', 'P', 'L']);
+interface TileDef {
+    texture: string;
+    assetPath: string;
+    walkable: boolean;
+    decoration?: {
+        texture: string;
+        assetPath: string;
+        ox?: number;
+        oy?: number;
+        offsetX?: number;
+        offsetY?: number;
+        scale?: number;
+    };
+}
 
-// ─── Texture key per tile type ────────────────────────────────────────────────
-// TODO (TICKET-02): ganti value string ini dengan key yang di-load di preload()
-const TILE_TEXTURE: Record<string, string> = {
-    G: 'tile_grass',
-    W: 'tile_wall',
-    T: 'tile_tree',     // dekorasi pohon
-    K: 'tile_building', // ruang kelas
-    P: 'tile_path',
-    L: 'tile_lapangan',
-    C: 'tile_canteen',
-    R: 'tile_road',
-    '!': 'tile_grass',  // NPC tile — sama dengan rumput
-    '?': 'tile_path',   // trigger tile
-    S: 'tile_grass',  // sumur — digambar sebagai dekor di buildBaseDecorations
+const TILE_DEFS: Record<string, TileDef> = {
+    G: {
+        texture: 'tile_grass',
+        assetPath: 'assets/tiles/grass.png',
+        walkable: true,
+    },
+    W: {
+        texture: 'tile_wall',
+        assetPath: 'assets/tiles/wall.png',
+        walkable: false,
+    },
+    T: {
+        // Pohon = ground rumput + decor pohon di atasnya, non-walkable.
+        texture: 'tile_grass',
+        assetPath: 'assets/tiles/grass.png',
+        walkable: false,
+        decoration: {
+            texture: 'decor_tree',
+            assetPath: 'assets/decor/tree.png',
+            ox: 0.5,
+            oy: 1,
+            offsetY: -8,
+            scale: 0.5,
+        },
+    },
+    K: {
+        texture: 'tile_building',
+        assetPath: 'assets/tiles/building.png',
+        walkable: false,
+    },
+    P: {
+        texture: 'tile_path',
+        assetPath: 'assets/tiles/path.png',
+        walkable: true,
+    },
+    L: {
+        texture: 'tile_lapangan',
+        assetPath: 'assets/tiles/lapangan.png',
+        walkable: true,
+    },
+    C: {
+        texture: 'tile_canteen',
+        assetPath: 'assets/tiles/canteen.png',
+        walkable: false,
+    },
+    R: {
+        texture: 'tile_road',
+        assetPath: 'assets/tiles/road.png',
+        walkable: false,
+    },
+    '!': {
+        // Tile gerbang tempat Pak Satpam berdiri. Sama dengan rumput visualnya;
+        // NPC sprite-nya yang membedakan saat NPC di-spawn.
+        texture: 'tile_grass',
+        assetPath: 'assets/tiles/grass.png',
+        walkable: true,
+    },
+    '?': {
+        // Tile trigger soal lapangan. TileTriggerSystem yang men-handle event-nya.
+        texture: 'tile_path',
+        assetPath: 'assets/tiles/path.png',
+        walkable: true,
+    },
+    S: {
+        // Sumur = ground rumput + decor sumur, walkable agar tile trigger jalan.
+        texture: 'tile_grass',
+        assetPath: 'assets/tiles/grass.png',
+        walkable: true,
+        decoration: {
+            texture: 'decor_well',
+            assetPath: 'assets/decor/well.png',
+            ox: 0.5,
+            oy: 1,
+            scale: 0.6,
+        },
+    },
+};
+
+// =============================================================================
+// TRIGGER REGISTRY
+// =============================================================================
+// Memetakan terrain char → semantic triggerId. Listener (DialogManager nanti)
+// resolve triggerId ke entry questions.json.
+
+const SCHOOL_TRIGGERS: TileTriggerRegistry = {
+    '?': 'lapangan_keliling',  // tile (6, 7)
+    'S': 'sumur_diameter',     // tile (6, 10)
+};
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+/** Lookup cell di SCHOOL_MAP dengan fallback ke DEFAULT_CELL. */
+const cellAt = (tx: number, ty: number): string =>
+    SCHOOL_MAP[ty]?.[tx] ?? DEFAULT_CELL;
+
+/** Lookup TileDef dengan fallback ke definisi DEFAULT_CELL. */
+const defOf = (cell: string): TileDef =>
+    TILE_DEFS[cell] ?? TILE_DEFS[DEFAULT_CELL]!;
+
+/** Iterasi seluruh cell di SCHOOL_MAP. */
+const forEachCell = (cb: (cell: string, tx: number, ty: number) => void): void => {
+    for (let ty = 0; ty < SCHOOL_MAP.length; ty++) {
+        const row = SCHOOL_MAP[ty];
+        if (!row) continue;
+        for (let tx = 0; tx < row.length; tx++) {
+            cb(row[tx]!, tx, ty);
+        }
+    }
 };
 
 // =============================================================================
@@ -94,13 +196,10 @@ export default class SchoolWorld extends BaseWorld {
     private player!: Player;
     private analogStick!: VirtualAnalog;
 
-    // ── NPC & Proximity (TICKET-04 / TICKET-05) ───────────────────────────────
+    // ── NPC & Systems ─────────────────────────────────────────────────────────
     private npcs: Npc[] = [];
     private proximitySystem: NpcProximitySystem | null = null;
-
-    // =========================================================================
-    // CONSTRUCTOR
-    // =========================================================================
+    private triggerSystem: TileTriggerSystem | null = null;
 
     constructor() {
         super('SchoolWorld');
@@ -111,59 +210,65 @@ export default class SchoolWorld extends BaseWorld {
     // PHASER LIFECYCLE
     // =========================================================================
 
-    // ── preload ───────────────────────────────────────────────────────────────
-
+    /**
+     * Auto-preload semua texture yang dideklarasikan di TILE_DEFS.
+     * Dedupe via Set — kalau dua TileDef pakai texture key yang sama,
+     * file hanya di-load sekali.
+     *
+     * Tinggal isi field assetPath di TILE_DEFS, asset auto ke-load.
+     */
     preload(): void {
-        // TODO (TICKET-02): load semua texture tile
-        // this.load.image('tile_grass',    'assets/tiles/grass.png');
-        // this.load.image('tile_wall',     'assets/tiles/wall.png');
-        // this.load.image('tile_tree',     'assets/tiles/tree.png');
-        // this.load.image('tile_building', 'assets/tiles/building.png');
-        // this.load.image('tile_path',     'assets/tiles/path.png');
-        // this.load.image('tile_lapangan', 'assets/tiles/lapangan.png');
-        // this.load.image('tile_canteen',  'assets/tiles/canteen.png');
-        // this.load.image('tile_road',     'assets/tiles/road.png');
+        const loaded = new Set<string>();
+        const tryLoad = (key: string, path: string): void => {
+            if (loaded.has(key)) return;
+            loaded.add(key);
+            this.load.image(key, path);
+        };
 
-        // TODO (TICKET-02): load NPC placeholder / spritesheet
-        // Player.preloadAssets(this);
+        for (const def of Object.values(TILE_DEFS)) {
+            tryLoad(def.texture, def.assetPath);
+            if (def.decoration) {
+                tryLoad(def.decoration.texture, def.decoration.assetPath);
+            }
+        }
+
+        // TODO (TICKET-02): NPC spritesheet kalau sudah ada art
+        Player.preloadAssets(this);
     }
-
-    // ── create ────────────────────────────────────────────────────────────────
 
     override create(): void {
         super.create(); // buildGrid → layers → camera → gridHelper
 
         this.spawnPlayer();
-
-        // TICKET-05: isi this.npcs
         this.spawnNpcs();
 
-        // TICKET-04: inisialisasi proximity system
         this.proximitySystem = new NpcProximitySystem(
             this,
             this.gridHelper,
             this.npcs,
             this.worldRoot,
         );
-    }
 
-    // ── update ────────────────────────────────────────────────────────────────
+        this.triggerSystem = new TileTriggerSystem(
+            this.grid,
+            SCHOOL_TRIGGERS,
+            this.player.entityId,
+        );
+    }
 
     override update(time: number, delta: number): void {
         super.update(time, delta); // Y-sort depth
 
-        // NPC idle tick (TICKET-13)
         for (const npc of this.npcs) {
             npc.tick(time, delta);
         }
 
-        // Proximity detection setiap frame (TICKET-04)
         this.proximitySystem?.update(this.player);
     }
 
-    // ── shutdown ──────────────────────────────────────────────────────────────
-
     override shutdown(): void {
+        this.triggerSystem?.destroy();
+        this.triggerSystem = null;
         this.proximitySystem?.destroy();
         this.proximitySystem = null;
         this.analogStick?.destroy();
@@ -171,81 +276,59 @@ export default class SchoolWorld extends BaseWorld {
     }
 
     // =========================================================================
-    // BASEWORLD OVERRIDES — tile system (TICKET-01)
+    // BASEWORLD OVERRIDES — TILE SYSTEM
     // =========================================================================
 
-    /**
-     * Kembalikan texture key untuk setiap tile berdasarkan SCHOOL_MAP.
-     * Dipanggil BaseWorld.buildGrid() untuk setiap koordinat (tx, ty).
-     */
+    /** Texture key per tile, di-resolve via TILE_DEFS. */
     protected override getBaseTileTexture(tx: number, ty: number): string {
-        const cell = SCHOOL_MAP[ty]?.[tx] ?? 'G';
-        return TILE_TEXTURE[cell] ?? 'tile_grass';
+        return defOf(cellAt(tx, ty)).texture;
     }
 
     /**
-     * Hook setelah tile dibuat — set isTroughable dan terrain berdasarkan tipe.
-     * Dipanggil BaseWorld.buildGrid() untuk setiap TileNode setelah tile di-render.
-     *
-     * TODO (TICKET-01): lengkapi logic isTroughable untuk semua tile type
+     * Set walkability + simpan terrain char di node.
+     * `terrain` di-pakai TileTriggerSystem untuk lookup ke SCHOOL_TRIGGERS.
      */
     protected override onTileCreated(node: TileNode): void {
-        const cell = SCHOOL_MAP[node.ty]?.[node.tx] ?? 'G';
+        const cell = cellAt(node.tx, node.ty);
+        const def = defOf(cell);
 
         node.terrain = cell;
+        node.isTroughable = def.walkable;
 
-        if (NON_WALKABLE.has(cell)) {
-            node.isTroughable = false;
-            node.occupied = true;
-        } else if (FORCE_WALKABLE.has(cell)) {
-            node.isTroughable = true;
-        } else {
-            // Default 'G' dan tile lain = walkable
-            node.isTroughable = true;
-        }
+        // Tile yang gak walkable juga ditandai occupied — biar pathfinding
+        // future tahu ada blocker fisik (pohon, tembok, dll), bukan cuma
+        // "permukaan tidak bisa diinjak".
+        if (!def.walkable) node.occupied = true;
     }
 
     /**
-     * Tempatkan dekorasi statis (pohon, sumur, dll) di atas tile yang sesuai.
-     *
-     * TODO (TICKET-01): tambahkan dekorasi berdasarkan posisi T, S di SCHOOL_MAP
-     * Referensi pola dari HomeWorld.buildBaseDecorations()
+     * Auto-place dekorasi: iterasi semua cell, place sprite untuk yang
+     * punya field `decoration`. Tinggal nambah `decoration` di TILE_DEFS,
+     * gak perlu nambah loop manual di sini.
      */
     protected override buildBaseDecorations(): void {
-        // TODO: iterasi SCHOOL_MAP, temukan tile T → placeDecoration pohon
-        // TODO: tile S (tx=6, ty=10) → placeDecoration sumur
-        // Contoh:
-        // this.placeDecoration({ tx: 2, ty: 2, texture: 'tile_tree', ox: 0.5, oy: 1, scale: 0.5 });
-    }
+        forEachCell((cell, tx, ty) => {
+            const decor = defOf(cell).decoration;
+            if (!decor) return;
 
-    /**
-     * Required abstract dari BaseWorld — SchoolWorld pakai SCHOOL_MAP,
-     * bukan MapConfig object. Kembalikan dummy config; semua logic ada di
-     * getBaseTileTexture() dan onTileCreated().
-     *
-     * TODO (TICKET-01): hapus atau isi jika BaseWorld butuh MapConfig penuh
-     */
-    protected getMapConfig(): MapConfig {
-        return {
-            worldSize: 13,
-            tileWidth: this.tileW,
-            tileHeight: this.tileH,
-            originX: this.originX,
-            originY: this.originY,
-            getBaseTileTexture: (tx, ty) => this.getBaseTileTexture(tx, ty),
-            tileModification: [],
-        };
+            this.placeDecoration({
+                tx,
+                ty,
+                texture: decor.texture,
+                ox: decor.ox,
+                oy: decor.oy,
+                offsetX: decor.offsetX,
+                offsetY: decor.offsetY,
+                scale: decor.scale,
+            });
+        });
     }
 
     // =========================================================================
     // SPAWNING
     // =========================================================================
 
-    /**
-     * Spawn player di tile gerbang (1, 6).
-     *
-     * TODO (TICKET-01): konfirmasi koordinat spawn sesuai layout final
-     */
+    /** Player spawn di tile (1, 6) — tepat di depan gerbang, dalam range Pak Satpam. */
     private spawnPlayer(): void {
         this.analogStick = new VirtualAnalog(this, this.worldRoot);
 
@@ -264,15 +347,29 @@ export default class SchoolWorld extends BaseWorld {
     }
 
     /**
-     * Spawn 3 NPC sesuai posisi di GDD.
+     * Spawn 3 NPC sesuai layout SCHOOL_MAP.
      *
-     * TODO (TICKET-05): implementasi penuh (markOccupied, npcId, displayName)
+     * Catatan koordinat — di GDD `!` ada di (0, 6), bukan (1, 6) seperti
+     * di tiket. Aku ikut layout (sumber visual lebih jujur dari tiket).
+     *
+     * TODO (TICKET-05): uncomment + verifikasi import Npc setelah tile art ready
      */
     private spawnNpcs(): void {
-        // TODO (TICKET-05):
-        // const pakSatpam = new Npc({ id: 'npc_satpam', scene: this, tx: 1,  ty: 6, gridUnit: this.gridUnit, npcId: 'pak_satpam', displayName: 'Pak Satpam' });
-        // const pakGuru   = new Npc({ id: 'npc_guru',   scene: this, tx: 5,  ty: 3, gridUnit: this.gridUnit, npcId: 'pak_guru',   displayName: 'Pak Guru'   });
-        // const buKantin  = new Npc({ id: 'npc_kantin', scene: this, tx: 2,  ty: 8, gridUnit: this.gridUnit, npcId: 'bu_kantin',  displayName: 'Bu Kantin'  });
+        // const pakSatpam = new Npc({
+        //     id: 'npc_satpam', scene: this, tx: 0, ty: 6,
+        //     gridUnit: this.gridUnit,
+        //     npcId: 'pak_satpam', displayName: 'Pak Satpam',
+        // });
+        // const pakGuru = new Npc({
+        //     id: 'npc_guru', scene: this, tx: 5, ty: 3,
+        //     gridUnit: this.gridUnit,
+        //     npcId: 'pak_guru', displayName: 'Pak Guru',
+        // });
+        // const buKantin = new Npc({
+        //     id: 'npc_kantin', scene: this, tx: 2, ty: 8,
+        //     gridUnit: this.gridUnit,
+        //     npcId: 'bu_kantin', displayName: 'Bu Kantin',
+        // });
         //
         // for (const npc of [pakSatpam, pakGuru, buKantin]) {
         //     this.placeEntityAtTile(npc.tileX, npc.tileY, npc);

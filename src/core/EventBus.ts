@@ -32,6 +32,11 @@ export const GameEvent = {
     // ── World progression ─────────────────────────────────────────────────────
     // Fired by GameState when all registered questions for a world are complete.
     WORLD_COMPLETE: 'world:complete',
+
+    // ── Tile triggers ─────────────────────────────────────────────────────────
+    // Fired by TileTriggerSystem when player steps onto a tile that has been
+    // registered as a trigger. Carries semantic triggerId, not raw terrain char.
+    TILE_TRIGGER_ENTERED: 'tile:trigger_entered',
 } as const;
 
 export type GameEvent = (typeof GameEvent)[keyof typeof GameEvent];
@@ -67,6 +72,19 @@ export interface EventPayloadMap {
     // world progression
     /** worldKey — matches Phaser scene key, e.g. 'SchoolWorld' */
     [GameEvent.WORLD_COMPLETE]: { worldKey: string };
+
+    /**
+    * triggerId — semantic identifier from TileTriggerRegistry,
+    *             e.g. 'lapangan_keliling', NOT the raw terrain char '?'.
+    * tx, ty    — tile coordinates of the trigger.
+    * entityId  — entity that stepped on it (typically player).
+    */
+    [GameEvent.TILE_TRIGGER_ENTERED]: {
+        triggerId: string;
+        tx: number;
+        ty: number;
+        entityId: string;
+    };
 }
 
 // ─── Typed Emitter ────────────────────────────────────────────────────────────

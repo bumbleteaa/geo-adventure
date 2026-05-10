@@ -1,34 +1,43 @@
-// Abstrac class for world, which can be extended to create specific worlds with their own rooms, items, and interactions.
+// Abstract class for world, which can be extended to create specific worlds
+// with their own rooms, items, and interactions.
 
 import Phaser from "phaser";
 import { IsoMath } from "../core/IsoMath";
-import type { TileNode, DecorConfig, MapConfig } from "./WorldTypes";
 import { GridHelper } from '../core/GridHelper';
+import type { TileNode, DecorConfig } from "./WorldTypes";
 
 
 function isDepthSortable(child: Phaser.GameObjects.GameObject): child is Phaser.GameObjects.Image | Phaser.GameObjects.Sprite {
     return 'setDepth' in child && 'y' in child;
 }
+
 export default abstract class BaseWorld extends Phaser.Scene {
     // ! =======================================================================
     // ! CLASS PROPERTIES
     // ! =======================================================================
 
-    protected worldRoot!: Phaser.GameObjects.Container; //container based
-    //Layer-layer dalam pembuatan world
+    protected worldRoot!: Phaser.GameObjects.Container; // container based
+    // Layer-layer dalam pembuatan world
     protected groundLayer!: Phaser.GameObjects.Container;
     protected decorLayer!: Phaser.GameObjects.Container;
     protected entityLayer!: Phaser.GameObjects.Container;
+
     protected worldSize = 13;
     protected gridUnit = 16;
+
+    /**
+     * Grid 2D node tile — diisi oleh buildGrid().
+     * Konvensi: grid[tx][ty] (column-major), bukan grid[ty][tx].
+     * Tile maps di concrete world (mis. SCHOOL_MAP) row-major untuk readability.
+     */
     protected grid: TileNode[][] = [];
+
     protected gridHelper!: GridHelper;
+
     protected readonly tileW: number = 32;   // lebar tile penuh (pixel)
     protected readonly tileH: number = 16;   // tinggi tile penuh (pixel)
     protected readonly originX: number = 0;  // pixel X titik awal grid
     protected readonly originY: number = 0;  // pixel Y titik awal grid
-
-    protected abstract getMapConfig(): MapConfig;
 
     constructor(key: string) {
         super(key);
@@ -53,7 +62,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
     }
 
     // * Per-frame loop for depth sorting (Y-Sorting)
-    update(time: number, delta: number): void {
+    update(_time: number, _delta: number): void {
         const byY = (a: Phaser.GameObjects.GameObject, b: Phaser.GameObjects.GameObject): number => {
             const ay = isDepthSortable(a) ? a.y : 0;
             const by = isDepthSortable(b) ? b.y : 0;
@@ -68,7 +77,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
     shutdown(): void { }
 
     // ! =======================================================================
-    // ! LAYOUT INITIALIZER 
+    // ! LAYOUT INITIALIZER
     // ! =======================================================================
 
     // * Main container or root for entire object in concrete world
@@ -82,7 +91,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
         this.decorLayer = this.add.container(0, 0);
         this.entityLayer = this.add.container(0, 0);
 
-        this.worldRoot.add([this.groundLayer, this.decorLayer, this.entityLayer])
+        this.worldRoot.add([this.groundLayer, this.decorLayer, this.entityLayer]);
     }
 
     // * Coordinate iteration for ground tile building
@@ -110,9 +119,10 @@ export default abstract class BaseWorld extends Phaser.Scene {
                     terrain: this.getTerrainType(tx, ty),
                     isTroughable: true,
                 };
-                if (!this.grid[tx]) this.grid[tx] = [];
 
+                if (!this.grid[tx]) this.grid[tx] = [];
                 this.grid[tx][ty] = node;
+
                 this.onTileCreated(node);
             }
         }
@@ -142,13 +152,12 @@ export default abstract class BaseWorld extends Phaser.Scene {
     // ! WORLD COORDINATE SYSTEM
     // ! =======================================================================
 
-
     protected getLocalTilePosition(tx: number, ty: number): { x: number; y: number } {
         const cartX = tx * this.gridUnit;
         const cartY = ty * this.gridUnit;
         const isometric = IsoMath.cartToIso(cartX, cartY);
 
-        return { x: isometric.isoX, y: isometric.isoY }
+        return { x: isometric.isoX, y: isometric.isoY };
     }
 
     protected getWorldCenterLocal(): { x: number; y: number } {
@@ -157,15 +166,11 @@ export default abstract class BaseWorld extends Phaser.Scene {
     }
 
     // * Pixel coordinate to tile grid
-    public worldToTile(worldX: number, worldY: number): {
-        tx: number;
-        ty: number;
-    } {
-        //The world coordinate offset normalization
+    public worldToTile(worldX: number, worldY: number): { tx: number; ty: number } {
+        // The world coordinate offset normalization
         const localX = worldX - this.worldRoot.x;
         const localY = worldY - this.worldRoot.y;
 
-        //Call the IsoMath.screenToTile operation
         const raw = IsoMath.screenToTile(
             localX, localY,
             this.tileW,
@@ -174,17 +179,13 @@ export default abstract class BaseWorld extends Phaser.Scene {
             this.originY,
         );
         return {
-            //return to the round number
             tx: Math.round(raw.tx),
             ty: Math.round(raw.ty),
         };
     }
 
     // * Screen pixel (input touch) to tile grid
-    public screenToTile(screenX: number, screenY: number): {
-        tx: number;
-        ty: number
-    } {
+    public screenToTile(screenX: number, screenY: number): { tx: number; ty: number } {
         const worldPoint = this.cameras.main.getWorldPoint(screenX, screenY);
         return this.worldToTile(worldPoint.x, worldPoint.y);
     }
@@ -212,15 +213,13 @@ export default abstract class BaseWorld extends Phaser.Scene {
 
     // * Can the entity pass the tile?
     public isWalkable(tx: number, ty: number): boolean {
-        // If coordinate = negative, walkable is false
-        // If cordinate more size worldSize, walkable is false
         if (tx < 0 || ty < 0 || tx >= this.worldSize || ty >= this.worldSize) {
             return false;
         }
 
-        const tile = this.getTileNode(tx, ty); //put the object's data
-        if (!tile) return false; //Null check
-        return tile.isTroughable && !tile.occupied; //return the isWalkable when the tile is troughable and not occupied
+        const tile = this.getTileNode(tx, ty);
+        if (!tile) return false;
+        return tile.isTroughable && !tile.occupied;
     }
 
     // ! =======================================================================
@@ -263,7 +262,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
     }
 
     // ! =======================================================================
-    // ! OVERRIDEABLE CONFIG (CONCRETE WORLD CONTEXT CONFIG)
+    // ! OVERRIDEABLE CONFIG (CONCRETE WORLD CONTEXT)
     // ! =======================================================================
 
     protected getBaseTileTexture(_tx: number, _ty: number): string {
@@ -284,8 +283,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
         _ty: number
     ): void { }
 
-    protected onTileCreated(tile: TileNode): void { }
+    protected onTileCreated(_tile: TileNode): void { }
 
     protected buildBaseDecorations(): void { }
-
 }
