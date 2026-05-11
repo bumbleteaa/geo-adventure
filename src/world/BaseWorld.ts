@@ -117,7 +117,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
                     base: tile,
                     occupied: false,
                     terrain: this.getTerrainType(tx, ty),
-                    isTroughable: true,
+                    isThroughable: true,
                 };
 
                 if (!this.grid[tx]) this.grid[tx] = [];
@@ -219,7 +219,7 @@ export default abstract class BaseWorld extends Phaser.Scene {
 
         const tile = this.getTileNode(tx, ty);
         if (!tile) return false;
-        return tile.isTroughable && !tile.occupied;
+        return tile.isThroughable && !tile.occupied;
     }
 
     // ! =======================================================================

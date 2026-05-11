@@ -226,21 +226,23 @@ export class Player extends BaseEntity {
             const start = row * FRAMES_PER_ROW;
             const end = start + FRAMES_PER_ROW - 1;
 
-            // Idle animation
-            this.scene.anims.create({
-                key: animKey('idle', dir),
-                frames: this.scene.anims.generateFrameNumbers(TEXTURE_IDLE, { start, end }),
-                frameRate: ANIM_FRAME_RATE,
-                repeat: -1, // loop forever
-            });
+            if (!this.scene.anims.exists(animKey('idle', dir))) {
+                this.scene.anims.create({
+                    key: animKey('idle', dir),
+                    frames: this.scene.anims.generateFrameNumbers(TEXTURE_IDLE, { start, end }),
+                    frameRate: ANIM_FRAME_RATE,
+                    repeat: -1,
+                });
+            }
 
-            // Walk animation
-            this.scene.anims.create({
-                key: animKey('walk', dir),
-                frames: this.scene.anims.generateFrameNumbers(TEXTURE_WALK, { start, end }),
-                frameRate: ANIM_FRAME_RATE,
-                repeat: -1,
-            });
+            if (!this.scene.anims.exists(animKey('walk', dir))) {
+                this.scene.anims.create({
+                    key: animKey('walk', dir),
+                    frames: this.scene.anims.generateFrameNumbers(TEXTURE_WALK, { start, end }),
+                    frameRate: ANIM_FRAME_RATE,
+                    repeat: -1,
+                });
+            }
         }
     }
 

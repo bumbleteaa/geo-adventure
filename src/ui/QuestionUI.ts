@@ -8,6 +8,7 @@ import { EventBus, GameEvent } from '../core/EventBus';
 export interface Question {
     id: string;
     npc_id: string;
+    tile_trigger_id?: string; // opsional
     teks_soal: string;
     jawaban: number;
     hint: string;

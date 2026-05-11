@@ -7,7 +7,7 @@ import type { AnalogStick } from "../entities/Player";
 const STICK_X_OFFSET = 100;
 const STICK_Y_OFFSET = 100;
 const STICK_RADIUS = 50;
-const FORCE_MIN = 10;
+const FORCE_MIN = 15;
 
 // * Virtual analog
 export class VirtualAnalog implements AnalogStick {
