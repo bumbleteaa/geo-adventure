@@ -6,16 +6,29 @@ import { EventBus, GameEvent } from '../core/EventBus';
 import { DialogUI } from '../ui/DialogUI';
 import { QuestionUI } from '../ui/QuestionUI';
 import { DialogManager } from '../core/DialogManager';
+import { Npc } from '../entities/Npc';
+import { NpcProximitySystem } from '../entities/NpcProximitySystem';
 import type { TileNode, DecorConfig } from './WorldTypes';
 
-const BEDROOM_MAP: string[][] = [
+// =============================================================================
+// TILE MAP — 6×8
+// =============================================================================
+//
+//   W = wall (non-walkable)
+//   F = floor (walkable)
+//   Q = question tile (walkable, trigger soal)
+//   > = portal ke SchoolWorld
+
+const CLASSROOM_MAP: string[][] = [
     // tx:  0    1    2    3    4    5
     /* ty 0 */['W', 'W', 'W', 'W', 'W', 'W'],
-    /* ty 1 */['W', 'W', 'W', 'Q', 'F', 'W'],
-    /* ty 2 */['W', 'F', 'F', 'F', 'F', 'W'],
-    /* ty 3 */['W', 'F', 'F', 'F', 'F', 'W'],
-    /* ty 4 */['W', 'F', 'F', 'F', 'F', 'W'],
-    /* ty 5 */['W', 'W', '>', '>', 'W', 'W'],
+    /* ty 1 */['W', 'F', 'F', 'F', 'F', 'W'],
+    /* ty 2 */['W', 'W', 'F', 'W', 'F', 'W'],
+    /* ty 3 */['W', 'W', 'F', 'W', 'F', 'W'],
+    /* ty 4 */['W', 'W', 'F', 'W', 'F', 'W'],
+    /* ty 5 */['W', 'W', 'F', 'W', 'F', 'W'],
+    /* ty 6 */['W', 'W', 'F', 'W', 'F', 'W'],
+    /* ty 7 */['W', '>', 'W', '>', 'W', 'W'],
 ];
 
 const DEFAULT_CELL = 'F';
@@ -27,24 +40,28 @@ interface TileDef {
 }
 
 const TILE_DEFS: Record<string, TileDef> = {
-    F: { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: true },
-    W: { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: false },
-    '>': { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: true },
-    Q: { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: true },
+    F: { texture: 'classroom_floor', assetPath: 'assets/floor_tile.png', walkable: true },
+    W: { texture: 'classroom_floor', assetPath: 'assets/floor_tile.png', walkable: false },
+    '>': { texture: 'classroom_floor', assetPath: 'assets/floor_tile.png', walkable: true },
+    Q: { texture: 'classroom_floor', assetPath: 'assets/floor_tile.png', walkable: true },
 };
 
-const BEDROOM_TRIGGERS: TileTriggerRegistry = {
-    '>': 'portal_to_home',
-    'Q': 'bedroom_q',
+const CLASSROOM_TRIGGERS: TileTriggerRegistry = {
+    '>': 'portal_to_school',
+    'Q': 'classroom_q',
 };
 
 const cellAt = (tx: number, ty: number): string =>
-    BEDROOM_MAP[ty]?.[tx] ?? DEFAULT_CELL;
+    CLASSROOM_MAP[ty]?.[tx] ?? DEFAULT_CELL;
 
 const defOf = (cell: string): TileDef =>
     TILE_DEFS[cell] ?? TILE_DEFS[DEFAULT_CELL]!;
 
-export default class BedroomWorld extends BaseWorld {
+// =============================================================================
+// CLASSROOM WORLD
+// =============================================================================
+
+export default class ClassroomWorld extends BaseWorld {
 
     private player!: Player;
     private analogStick!: VirtualAnalog;
@@ -52,17 +69,23 @@ export default class BedroomWorld extends BaseWorld {
     private dialogUI!: DialogUI;
     private questionUI!: QuestionUI;
     private dialogManager!: DialogManager;
-
-    // Layer khusus wall — tidak ikut Y-sort decorLayer
-    private wallLayer!: Phaser.GameObjects.Container;
-
-    private _onTrigger!: (p: { triggerId: string; tx: number; ty: number; entityId: string }) => void;
     private questionIndicators: Phaser.GameObjects.Text[] = [];
 
+    // Pak Guru NPC
+    private pakGuru!: Npc;
+    private npcs: Npc[] = [];
+    private proximitySystem: NpcProximitySystem | null = null;
+
+    private _onTrigger!: (p: { triggerId: string; tx: number; ty: number; entityId: string }) => void;
+
     constructor() {
-        super('BedroomWorld');
-        this.worldSize = 6;
+        super('ClassroomWorld');
+        this.worldSize = 9;
     }
+
+    // =========================================================================
+    // PHASER LIFECYCLE
+    // =========================================================================
 
     preload(): void {
         const loaded = new Set<string>();
@@ -78,11 +101,9 @@ export default class BedroomWorld extends BaseWorld {
 
         this.load.image('wall_nw', 'assets/wall_nw.png');
         this.load.image('wall_ne', 'assets/wall_ne.png');
+        this.load.image('pak_guru_idle', 'assets/pak_guru.png');
         this.load.image('desk', 'assets/desk.png');
         this.load.image('chair', 'assets/chair.png');
-        this.load.image('bed', 'assets/bed.png');
-        this.load.image('carpet', 'assets/carpet.png');
-
 
         Player.preloadAssets(this);
     }
@@ -90,28 +111,31 @@ export default class BedroomWorld extends BaseWorld {
     override create(): void {
         super.create();
 
-        // wallLayer di-add setelah super.create() — di atas decorLayer
-        // tapi tidak ikut Y-sort karena BaseWorld.update() hanya sort decorLayer
-        //this.wallLayer = this.add.container(0, 0);
-        //this.worldRoot.add(this.wallLayer);
-
         this.spawnPlayer();
+        this.spawnNpcs();
         this.spawnQuestionIndicators();
 
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('BedroomWorld');
+        this.dialogManager.init('ClassroomWorld');
 
         this.triggerSystem = new TileTriggerSystem(
             this.grid,
-            BEDROOM_TRIGGERS,
+            CLASSROOM_TRIGGERS,
             this.player.entityId,
         );
 
+        this.proximitySystem = new NpcProximitySystem(
+            this,
+            this.gridHelper,
+            this.npcs,
+            this.worldRoot,
+        );
+
         this._onTrigger = ({ triggerId }) => {
-            if (triggerId === 'portal_to_home') {
-                this.scene.start('HomeWorld');
+            if (triggerId === 'portal_to_school') {
+                this.scene.start('SchoolWorld');
             }
         };
 
@@ -119,21 +143,28 @@ export default class BedroomWorld extends BaseWorld {
         EventBus.on(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
     }
 
-    protected override createLayers(): void {
-        super.createLayers();
-        this.wallLayer = this.add.container(0, 0);
-        this.worldRoot.add(this.wallLayer);
-    }
-
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {
         if (correct) this.updateIndicators();
     };
 
     override update(_time: number, delta: number): void {
-        // Y-sort jalan untuk decorLayer (furniture)
-        // wallLayer tidak di-sort karena tidak ada di decorLayer
-        super.update(_time, delta);
+        // Custom sort — wall selalu di belakang furniture
+        this.decorLayer.list.sort((a: any, b: any) => {
+            const aWall = a._isWall === true;
+            const bWall = b._isWall === true;
+            if (aWall && !bWall) return -1;
+            if (!aWall && bWall) return 1;
+            if (aWall && bWall) return (a._isoDepth ?? 0) - (b._isoDepth ?? 0);
+            return (a.y ?? 0) - (b.y ?? 0);
+        });
+
+        this.entityLayer.list.sort((a: any, b: any) =>
+            ('y' in a ? (a as any).y : 0) - ('y' in b ? (b as any).y : 0)
+        );
+
         this.player.tick(delta);
+        for (const npc of this.npcs) npc.tick(delta);
+        this.proximitySystem?.update(this.player);
     }
 
     override shutdown(): void {
@@ -144,6 +175,8 @@ export default class BedroomWorld extends BaseWorld {
         this.questionUI?.destroy();
         this.triggerSystem?.destroy();
         this.triggerSystem = null;
+        this.proximitySystem?.destroy();
+        this.proximitySystem = null;
         this.analogStick?.destroy();
         this.questionIndicators.forEach(i => i.destroy());
         this.questionIndicators = [];
@@ -168,8 +201,8 @@ export default class BedroomWorld extends BaseWorld {
 
     protected override buildBaseDecorations(): void {
         super.buildBaseDecorations();
-        this.placeDecorations();
         this.placeWalls();
+        this.placeDecorations();
     }
 
     // =========================================================================
@@ -211,15 +244,31 @@ export default class BedroomWorld extends BaseWorld {
     }
 
     // =========================================================================
-    // DECORATIONS — masuk decorLayer, ikut Y-sort
+    // DECORATIONS
     // =========================================================================
 
     private placeDecorations(): void {
         const placement: DecorConfig[] = [
-            { tx: 2, ty: 1, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
-            { tx: 2, ty: 2, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
-            { tx: 2, ty: 5, texture: 'bed', ox: 0.8, oy: 1.15, offsetY: 0, scale: 1 },
-            { tx: 5, ty: 4, texture: 'carpet', ox: 0.8, oy: 1, offsetY: 0, scale: 0.8 },
+            { tx: 2, ty: 3, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 2, ty: 4, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+            { tx: 2, ty: 5, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 2, ty: 6, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+            { tx: 2, ty: 7, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 2, ty: 8, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+
+            { tx: 4, ty: 3, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 4, ty: 4, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+            { tx: 4, ty: 5, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 4, ty: 6, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+            { tx: 4, ty: 7, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 4, ty: 8, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+
+            { tx: 6, ty: 3, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 6, ty: 4, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+            { tx: 6, ty: 5, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 6, ty: 6, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
+            { tx: 6, ty: 7, texture: 'desk', ox: 0.5, oy: 1, offsetY: 0, scale: 1 },
+            { tx: 6, ty: 8, texture: 'chair', ox: 0.2, oy: 1.45, offsetY: 0, scale: 0.5 },
         ];
 
         for (const config of placement) {
@@ -229,7 +278,7 @@ export default class BedroomWorld extends BaseWorld {
     }
 
     // =========================================================================
-    // WALLS — masuk wallLayer, TIDAK ikut Y-sort
+    // WALLS
     // =========================================================================
 
     private placeWalls(): void {
@@ -243,8 +292,9 @@ export default class BedroomWorld extends BaseWorld {
         const getIsoDepth = (tx: number, ty: number, level: number) =>
             (tx + ty) * 10 + level;
 
-        for (let tx = 0; tx <= 8; tx++) {
+        for (let tx = 0; tx <= 9; tx++) {
             for (let level = 0; level < LEVELS; level++) {
+                const depth = getIsoDepth(tx, 0, level);
                 const deco = this.placeWallDeco({
                     tx, ty: 0,
                     texture: 'wall_ne',
@@ -253,12 +303,15 @@ export default class BedroomWorld extends BaseWorld {
                     offsetY: -(level * WALL_HEIGHT) + NE_OFFSET_Y,
                     scale: 1,
                 });
-                if (deco) deco.setDepth(getIsoDepth(tx, 0, level));
+                if (deco) {
+                    (deco as any)._isoDepth = depth;
+                }
             }
         }
 
-        for (let ty = 0; ty <= 7; ty++) {
+        for (let ty = 0; ty <= 9; ty++) {
             for (let level = 0; level < LEVELS; level++) {
+                const depth = getIsoDepth(0, ty, level) + 0.5;
                 const deco = this.placeWallDeco({
                     tx: 0, ty,
                     texture: 'wall_nw',
@@ -267,12 +320,13 @@ export default class BedroomWorld extends BaseWorld {
                     offsetY: -(level * WALL_HEIGHT) + NW_OFFSET_Y,
                     scale: 1,
                 });
-                if (deco) deco.setDepth(getIsoDepth(0, ty, level) + 0.5);
+                if (deco) {
+                    (deco as any)._isoDepth = depth;
+                }
             }
         }
     }
 
-    // Taruh ke wallLayer, bukan decorLayer
     private placeWallDeco(config: DecorConfig): Phaser.GameObjects.Image | null {
         const tile = this.getTileNode(config.tx, config.ty);
         if (!tile) return null;
@@ -285,7 +339,8 @@ export default class BedroomWorld extends BaseWorld {
 
         obj.setOrigin(config.ox ?? 0.5, config.oy ?? 1);
         if (config.scale !== undefined) obj.setScale(config.scale);
-        this.wallLayer.add(obj); // ← wallLayer, bukan decorLayer
+        (obj as any)._isWall = true;
+        this.decorLayer.add(obj);
         return obj;
     }
 
@@ -300,13 +355,31 @@ export default class BedroomWorld extends BaseWorld {
             id: 'player_01',
             scene: this,
             tx: 3,
-            ty: 4,
+            ty: 6,
             gridUnit: this.gridUnit,
             analogStick: this.analogStick,
             walkabilityChecker: (tx, ty) => this.isWalkable(tx, ty),
         });
 
         this.player.initSprite();
-        this.placeEntityAtTile(3, 4, this.player);
+        this.placeEntityAtTile(3, 6, this.player);
+    }
+
+    private spawnNpcs(): void {
+        this.pakGuru = new Npc({
+            id: 'npc_guru',
+            scene: this,
+            tx: 3,
+            ty: 1,
+            gridUnit: this.gridUnit,
+            npcId: 'pak_guru',
+            displayName: 'Pak Guru',
+        });
+
+        this.placeEntityAtTile(this.pakGuru.tileX, this.pakGuru.tileY, this.pakGuru);
+        this.markOccupied(this.pakGuru.tileX, this.pakGuru.tileY);
+        this.pakGuru.initSprite('pak_guru_idle', 2);
+
+        this.npcs = [this.pakGuru];
     }
 }

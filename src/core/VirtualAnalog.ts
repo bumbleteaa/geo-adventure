@@ -37,6 +37,11 @@ export class VirtualAnalog implements AnalogStick {
 
         scene.cameras.main.ignore(this.Joystick.thumb);
         scene.cameras.main.ignore(this.Joystick.base!);
+        scene.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+            this._uiCamera.setSize(gameSize.width, gameSize.height);
+            this.Joystick.x = gameSize.width - STICK_X_OFFSET;
+            this.Joystick.y = gameSize.height - STICK_Y_OFFSET;
+        });
     }
 
     getVector(): { x: number; y: number; } {
@@ -69,6 +74,7 @@ export class VirtualAnalog implements AnalogStick {
 
 
     public destroy(): void {
+        this._scene.scale.off('resize');
         this.Joystick.destroy();
     }
 }

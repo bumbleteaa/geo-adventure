@@ -13,7 +13,7 @@ export class DialogManager {
     private readonly _question: QuestionUI;
 
     private _byNpc: Map<string, Question[]> = new Map();
-    private _byTile: Map<string, Question> = new Map();
+    private _byTile: Map<string, Question[]> = new Map(); // array — support multiple soal per trigger
     private _busy = false;
 
     private readonly _onNpcInteract: (payload: { npcId: string; playerId: string }) => void;
@@ -26,10 +26,6 @@ export class DialogManager {
         this._onTileTriggered = ({ triggerId }) => this._handleTileInteract(triggerId);
     }
 
-    // =========================================================================
-    // PUBLIC API
-    // =========================================================================
-
     async init(worldKey: string): Promise<void> {
         const questions = await this._loadQuestions();
 
@@ -39,7 +35,9 @@ export class DialogManager {
             this._byNpc.set(q.npc_id, npcList);
 
             if (q.tile_trigger_id) {
-                this._byTile.set(q.tile_trigger_id, q);
+                const tileList = this._byTile.get(q.tile_trigger_id) ?? [];
+                tileList.push(q);
+                this._byTile.set(q.tile_trigger_id, tileList);
             }
         }
 
@@ -64,7 +62,6 @@ export class DialogManager {
         const next = this._pickNextByNpc(npcId);
 
         if (!next) {
-            // All done
             if (npcId === PAK_GURU_ID) {
                 this._busy = true;
                 this._dialog.show('Pak Guru', PAK_GURU_ALL_DONE, () => {
@@ -74,7 +71,6 @@ export class DialogManager {
             return;
         }
 
-        // Pak Guru: dialog dulu baru soal
         if (npcId === PAK_GURU_ID) {
             this._busy = true;
             this._dialog.show('Pak Guru', PAK_GURU_GREETING, () => {
@@ -83,7 +79,6 @@ export class DialogManager {
             return;
         }
 
-        // NPC lain: langsung soal
         this._showQuestion(next);
     }
 
@@ -94,11 +89,11 @@ export class DialogManager {
     private _handleTileInteract(triggerId: string): void {
         if (this._busy) return;
 
-        const question = this._byTile.get(triggerId);
-        if (!question) return;
-        if (GameState.isComplete(question.id)) return;
+        const questions = this._byTile.get(triggerId) ?? [];
+        const next = questions.find(q => !GameState.isComplete(q.id));
+        if (!next) return;
 
-        this._showQuestion(question);
+        this._showQuestion(next);
     }
 
     // =========================================================================
@@ -139,12 +134,5 @@ export class DialogManager {
             console.error('[DialogManager] Gagal load questions.json:', err);
             return [];
         }
-    }
-
-    private _toDisplayName(npcId: string): string {
-        return npcId
-            .split('_')
-            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(' ');
     }
 }

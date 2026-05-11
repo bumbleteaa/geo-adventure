@@ -115,6 +115,8 @@ export default class HomeWorld extends BaseWorld {
             tryLoad(def.texture, def.assetPath);
         }
 
+
+        //Decor asset loader
         this.load.image('flower', 'assets/tile_041.png');
         this.load.image('tree', 'assets/tile_116.png');
         this.load.image('cherry-tree', 'assets/cherry_tree.png');

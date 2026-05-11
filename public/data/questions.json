@@ -1,44 +1,5 @@
 [
     {
-        "id": "q_satpam_01",
-        "npc_id": "pak_satpam",
-        "teks_soal": "Gerbang sekolah kita berbentuk persegi panjang. Panjangnya 6 meter dan lebarnya 3 meter. Berapa keliling gerbang itu?",
-        "jawaban": 18,
-        "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
-        "polya_steps": [
-            "Apa yang diketahui? Panjang = 6 m, Lebar = 3 m",
-            "Apa yang ditanyakan? Keliling gerbang",
-            "Rumus apa yang dipakai? K = 2 × (p + l)",
-            "Hitung: 2 × (6 + 3) = ?"
-        ]
-    },
-    {
-        "id": "q_satpam_02",
-        "npc_id": "pak_satpam",
-        "teks_soal": "Taman kecil di depan gerbang berbentuk persegi dengan sisi 4 meter. Berapa keliling taman itu?",
-        "jawaban": 16,
-        "hint": "Keliling persegi = 4 × sisi",
-        "polya_steps": [
-            "Apa yang diketahui? Sisi taman = 4 m",
-            "Apa yang ditanyakan? Keliling taman",
-            "Rumus apa yang dipakai? K = 4 × s",
-            "Hitung: 4 × 4 = ?"
-        ]
-    },
-    {
-        "id": "q_satpam_03",
-        "npc_id": "pak_satpam",
-        "teks_soal": "Pagar halaman sekolah berbentuk persegi panjang. Panjangnya 20 meter dan lebarnya 15 meter. Berapa meter panjang pagar seluruhnya?",
-        "jawaban": 70,
-        "hint": "Panjang pagar = keliling halaman = 2 × (p + l)",
-        "polya_steps": [
-            "Apa yang diketahui? Panjang = 20 m, Lebar = 15 m",
-            "Apa yang ditanyakan? Panjang pagar (= keliling)",
-            "Rumus apa yang dipakai? K = 2 × (p + l)",
-            "Hitung: 2 × (20 + 15) = ?"
-        ]
-    },
-    {
         "id": "q_guru_01",
         "npc_id": "pak_guru",
         "teks_soal": "Ruang kelas kita panjangnya 9 meter dan lebarnya 7 meter. Berapa luas ruang kelas itu?",
@@ -75,6 +36,104 @@
             "Apa yang ditanyakan? Keliling ruang kelas",
             "Rumus apa yang dipakai? K = 2 × (p + l)",
             "Hitung: 2 × (9 + 7) = ?"
+        ]
+    },
+    {
+        "id": "q_bedroom_01",
+        "npc_id": "tile",
+        "tile_trigger_id": "bedroom_q",
+        "teks_soal": "Kasur di kamarmu berbentuk persegi panjang. Panjangnya 2 meter dan lebarnya 1 meter. Berapa luas kasur itu?",
+        "jawaban": 2,
+        "hint": "Luas persegi panjang = panjang × lebar",
+        "polya_steps": [
+            "Apa yang diketahui? Panjang = 2 m, Lebar = 1 m",
+            "Apa yang ditanyakan? Luas kasur",
+            "Rumus apa yang dipakai? L = p × l",
+            "Hitung: 2 × 1 = ?"
+        ]
+    },
+    {
+        "id": "q_bedroom_02",
+        "npc_id": "tile",
+        "tile_trigger_id": "bedroom_q",
+        "teks_soal": "Meja belajarmu berbentuk persegi panjang. Panjangnya 120 cm dan lebarnya 60 cm. Berapa keliling meja itu?",
+        "jawaban": 360,
+        "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
+        "polya_steps": [
+            "Apa yang diketahui? Panjang = 120 cm, Lebar = 60 cm",
+            "Apa yang ditanyakan? Keliling meja belajar",
+            "Rumus apa yang dipakai? K = 2 × (p + l)",
+            "Hitung: 2 × (120 + 60) = ?"
+        ]
+    },
+    {
+        "id": "q_home_01",
+        "npc_id": "tile",
+        "tile_trigger_id": "home_q",
+        "teks_soal": "Pot bunga di depan rumah berbentuk persegi dengan sisi 30 cm. Berapa keliling alas pot itu?",
+        "jawaban": 120,
+        "hint": "Keliling persegi = 4 × sisi",
+        "polya_steps": [
+            "Apa yang diketahui? Sisi pot = 30 cm",
+            "Apa yang ditanyakan? Keliling alas pot",
+            "Rumus apa yang dipakai? K = 4 × s",
+            "Hitung: 4 × 30 = ?"
+        ]
+    },
+    {
+        "id": "q_classroom_01",
+        "npc_id": "tile",
+        "tile_trigger_id": "classroom_q",
+        "teks_soal": "Lantai kelas berbentuk persegi panjang. Panjangnya 9 meter dan lebarnya 7 meter. Berapa luas lantai kelas itu?",
+        "jawaban": 63,
+        "hint": "Luas persegi panjang = panjang × lebar",
+        "polya_steps": [
+            "Apa yang diketahui? Panjang = 9 m, Lebar = 7 m",
+            "Apa yang ditanyakan? Luas lantai kelas",
+            "Rumus apa yang dipakai? L = p × l",
+            "Hitung: 9 × 7 = ?"
+        ]
+    },
+    {
+        "id": "q_classroom_02",
+        "npc_id": "tile",
+        "tile_trigger_id": "classroom_q",
+        "teks_soal": "Jendela kelas berbentuk persegi dengan sisi 80 cm. Berapa keliling jendela itu?",
+        "jawaban": 320,
+        "hint": "Keliling persegi = 4 × sisi",
+        "polya_steps": [
+            "Apa yang diketahui? Sisi jendela = 80 cm",
+            "Apa yang ditanyakan? Keliling jendela kelas",
+            "Rumus apa yang dipakai? K = 4 × s",
+            "Hitung: 4 × 80 = ?"
+        ]
+    },
+    {
+        "id": "q_school_01",
+        "npc_id": "tile",
+        "tile_trigger_id": "school_q",
+        "teks_soal": "Tiang bendera di halaman sekolah berdiri di atas alas berbentuk persegi dengan sisi 50 cm. Berapa luas alas tiang bendera itu?",
+        "jawaban": 2500,
+        "hint": "Luas persegi = sisi × sisi",
+        "polya_steps": [
+            "Apa yang diketahui? Sisi alas = 50 cm",
+            "Apa yang ditanyakan? Luas alas tiang bendera",
+            "Rumus apa yang dipakai? L = s × s",
+            "Hitung: 50 × 50 = ?"
+        ]
+    },
+    {
+        "id": "q_school_02",
+        "npc_id": "tile",
+        "tile_trigger_id": "school_q",
+        "teks_soal": "Halaman upacara di sekolah berbentuk persegi panjang. Panjangnya 30 meter dan lebarnya 20 meter. Berapa keliling halaman upacara itu?",
+        "jawaban": 100,
+        "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
+        "polya_steps": [
+            "Apa yang diketahui? Panjang = 30 m, Lebar = 20 m",
+            "Apa yang ditanyakan? Keliling halaman upacara",
+            "Rumus apa yang dipakai? K = 2 × (p + l)",
+            "Hitung: 2 × (30 + 20) = ?"
         ]
     }
 ]
