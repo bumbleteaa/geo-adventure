@@ -15,7 +15,7 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.RESIZE, // Biar pas di semua ukuran layar HP
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [BedroomWorld, HomeWorld], // Kita masukin MeadowWorld sebagai scene pertama
+    scene: [BedroomWorld, HomeWorld, ClassroomWorld], // Kita masukin MeadowWorld sebagai scene pertama
     physics: {
         default: 'arcade',
         arcade: {
