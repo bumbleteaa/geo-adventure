@@ -56,22 +56,30 @@ export class DialogManager {
     // NPC FLOW
     // =========================================================================
 
+    // Tambah public method
+    public isTileComplete(triggerId: string): boolean {
+        const questions = this._byTile.get(triggerId) ?? [];
+        return questions.length > 0 && questions.every(q => GameState.isComplete(q.id));
+    }
+
+    // Fix _handleNpcInteract — greeting hanya di interaksi pertama
     private _handleNpcInteract(npcId: string): void {
         if (this._busy) return;
-
         const next = this._pickNextByNpc(npcId);
 
         if (!next) {
             if (npcId === PAK_GURU_ID) {
                 this._busy = true;
-                this._dialog.show('Pak Guru', PAK_GURU_ALL_DONE, () => {
-                    this._busy = false;
-                });
+                this._dialog.show('Pak Guru', PAK_GURU_ALL_DONE, () => { this._busy = false; });
             }
             return;
         }
 
-        if (npcId === PAK_GURU_ID) {
+        // Greeting hanya kalau belum ada soal yang selesai sama sekali
+        const allQuestions = this._byNpc.get(npcId) ?? [];
+        const anyDone = allQuestions.some(q => GameState.isComplete(q.id));
+
+        if (npcId === PAK_GURU_ID && !anyDone) {
             this._busy = true;
             this._dialog.show('Pak Guru', PAK_GURU_GREETING, () => {
                 this._showQuestion(next);
@@ -81,6 +89,8 @@ export class DialogManager {
 
         this._showQuestion(next);
     }
+
+
 
     // =========================================================================
     // TILE FLOW

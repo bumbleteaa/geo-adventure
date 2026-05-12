@@ -47,7 +47,7 @@ const TILE_DEFS: Record<string, TileDef> = {
 };
 
 const CLASSROOM_TRIGGERS: TileTriggerRegistry = {
-    '>': 'portal_to_school',
+    '>': 'portal_to_home',
     'Q': 'classroom_q',
 };
 
@@ -134,8 +134,8 @@ export default class ClassroomWorld extends BaseWorld {
         );
 
         this._onTrigger = ({ triggerId }) => {
-            if (triggerId === 'portal_to_school') {
-                this.scene.start('SchoolWorld');
+            if (triggerId === 'portal_to_home') {
+                this.scene.start('HomeWorld');
             }
         };
 
