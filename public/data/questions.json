@@ -1,7 +1,7 @@
 [
     {
         "id": "q_guru_01",
-        "npc_id": "pak_guru",
+        "trigger_id": "pak_guru",
         "teks_soal": "Ruang kelas kita panjangnya 9 meter dan lebarnya 7 meter. Berapa luas ruang kelas itu?",
         "jawaban": 63,
         "hint": "Luas persegi panjang = panjang × lebar",
@@ -14,7 +14,7 @@
     },
     {
         "id": "q_guru_02",
-        "npc_id": "pak_guru",
+        "trigger_id": "pak_guru",
         "teks_soal": "Papan tulis di depan kelas panjangnya 3 meter dan lebarnya 1 meter. Berapa luas papan tulis itu?",
         "jawaban": 3,
         "hint": "Luas persegi panjang = panjang × lebar",
@@ -27,7 +27,7 @@
     },
     {
         "id": "q_guru_03",
-        "npc_id": "pak_guru",
+        "trigger_id": "pak_guru",
         "teks_soal": "Ruang kelas panjangnya 9 meter dan lebarnya 7 meter. Berapa keliling ruang kelas itu?",
         "jawaban": 32,
         "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
@@ -40,8 +40,7 @@
     },
     {
         "id": "q_bedroom_01",
-        "npc_id": "tile",
-        "tile_trigger_id": "bedroom_q",
+        "trigger_id": "bedroom_q",
         "teks_soal": "Kasur di kamarmu berbentuk persegi panjang. Panjangnya 2 meter dan lebarnya 1 meter. Berapa luas kasur itu?",
         "jawaban": 2,
         "hint": "Luas persegi panjang = panjang × lebar",
@@ -54,8 +53,7 @@
     },
     {
         "id": "q_bedroom_02",
-        "npc_id": "tile",
-        "tile_trigger_id": "bedroom_q",
+        "trigger_id": "bedroom_q",
         "teks_soal": "Meja belajarmu berbentuk persegi panjang. Panjangnya 120 cm dan lebarnya 60 cm. Berapa keliling meja itu?",
         "jawaban": 360,
         "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
@@ -68,8 +66,7 @@
     },
     {
         "id": "q_home_01",
-        "npc_id": "tile",
-        "tile_trigger_id": "home_q",
+        "trigger_id": "home_q",
         "teks_soal": "Pot bunga di depan rumah berbentuk persegi dengan sisi 30 cm. Berapa keliling alas pot itu?",
         "jawaban": 120,
         "hint": "Keliling persegi = 4 × sisi",
@@ -82,8 +79,7 @@
     },
     {
         "id": "q_classroom_01",
-        "npc_id": "tile",
-        "tile_trigger_id": "classroom_q",
+        "trigger_id": "classroom_q",
         "teks_soal": "Lantai kelas berbentuk persegi panjang. Panjangnya 9 meter dan lebarnya 7 meter. Berapa luas lantai kelas itu?",
         "jawaban": 63,
         "hint": "Luas persegi panjang = panjang × lebar",
@@ -96,8 +92,7 @@
     },
     {
         "id": "q_classroom_02",
-        "npc_id": "tile",
-        "tile_trigger_id": "classroom_q",
+        "trigger_id": "classroom_q",
         "teks_soal": "Jendela kelas berbentuk persegi dengan sisi 80 cm. Berapa keliling jendela itu?",
         "jawaban": 320,
         "hint": "Keliling persegi = 4 × sisi",
@@ -110,8 +105,7 @@
     },
     {
         "id": "q_school_01",
-        "npc_id": "tile",
-        "tile_trigger_id": "school_q",
+        "trigger_id": "school_q",
         "teks_soal": "Tiang bendera di halaman sekolah berdiri di atas alas berbentuk persegi dengan sisi 50 cm. Berapa luas alas tiang bendera itu?",
         "jawaban": 2500,
         "hint": "Luas persegi = sisi × sisi",
@@ -124,8 +118,7 @@
     },
     {
         "id": "q_school_02",
-        "npc_id": "tile",
-        "tile_trigger_id": "school_q",
+        "trigger_id": "school_q",
         "teks_soal": "Halaman upacara di sekolah berbentuk persegi panjang. Panjangnya 30 meter dan lebarnya 20 meter. Berapa keliling halaman upacara itu?",
         "jawaban": 100,
         "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
