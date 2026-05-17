@@ -8,6 +8,8 @@ import { TileTriggerSystem, type TileTriggerRegistry } from '../core/TileTrigger
 import { DialogUI } from '../ui/DialogUI';
 import { QuestionUI } from '../ui/QuestionUI';
 import { DialogManager } from '../core/DialogManager';
+import { HudUI } from '../ui/HudUI';
+import { WorldCompleteUI } from '../ui/WorldCompleteUI';
 
 // =============================================================================
 // TILE MAP — 11×11
@@ -89,6 +91,8 @@ export default class HomeWorld extends BaseWorld {
     private dialogUI!: DialogUI;
     private questionUI!: QuestionUI;
     private dialogManager!: DialogManager;
+    private hud!: HudUI;
+    private _onWorldComplete!: (p: { worldKey: string }) => void;
 
     private questionIndicators: Phaser.GameObjects.Text[] = [];
 
@@ -132,12 +136,14 @@ export default class HomeWorld extends BaseWorld {
         super.create();
 
         this.spawnPlayer();
+        this.hud = new HudUI();
+        this.hud.show();
         this.spawnQuestionIndicators();
 
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('HomeWorld');
+        this.dialogManager.init('HomeWorld', ['home_q']);
 
         this.triggerSystem = new TileTriggerSystem(
             this.grid,
@@ -158,6 +164,16 @@ export default class HomeWorld extends BaseWorld {
 
         this.setupDebugOverlay();
         this.bindDebugToggle();
+
+        this._onWorldComplete = ({ worldKey }) => {
+            if (worldKey !== 'HomeWorld') return;
+            WorldCompleteUI.show({
+                worldName: 'Ruang Kelas',
+                onNext: () => this.scene.start('ClassroomWorld'),
+                nextLabel: 'Ke Sekolah»',
+            });
+        };
+        EventBus.on(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
     }
 
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {
@@ -172,7 +188,11 @@ export default class HomeWorld extends BaseWorld {
     override shutdown(): void {
         EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
         EventBus.off(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
+        EventBus.off(GameEvent.WORLD_COMPLETE, this._onWorldComplete);  // ← naik ke sini
         this.dialogManager?.destroy();
+        this.dialogUI?.destroy();
+        this.questionUI?.destroy();
+        this.hud?.destroy();
         this.triggerSystem?.destroy();
         this.triggerSystem = null;
         this.debugTexts.forEach(t => t.destroy());

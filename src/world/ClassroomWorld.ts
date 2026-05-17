@@ -8,6 +8,8 @@ import { QuestionUI } from '../ui/QuestionUI';
 import { DialogManager } from '../core/DialogManager';
 import { Npc } from '../entities/Npc';
 import { NpcProximitySystem } from '../entities/NpcProximitySystem';
+import { HudUI } from '../ui/HudUI';
+import { WorldCompleteUI } from '../ui/WorldCompleteUI';
 import type { TileNode, DecorConfig } from './WorldTypes';
 
 // =============================================================================
@@ -70,6 +72,8 @@ export default class ClassroomWorld extends BaseWorld {
     private questionUI!: QuestionUI;
     private dialogManager!: DialogManager;
     private questionIndicators: Phaser.GameObjects.Text[] = [];
+    private hud!: HudUI;
+    private _onWorldComplete!: (p: { worldKey: string }) => void;
 
     // Pak Guru NPC
     private pakGuru!: Npc;
@@ -118,7 +122,7 @@ export default class ClassroomWorld extends BaseWorld {
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('ClassroomWorld');
+        this.dialogManager.init('ClassroomWorld', ['pak_guru']);
 
         this.triggerSystem = new TileTriggerSystem(
             this.grid,
@@ -141,11 +145,27 @@ export default class ClassroomWorld extends BaseWorld {
 
         EventBus.on(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
         EventBus.on(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
+
+        this.hud = new HudUI();
+        this.hud.show();
+
+        this._onWorldComplete = ({ worldKey }) => {
+            if (worldKey !== 'ClassroomWorld') return;
+            WorldCompleteUI.show({
+                worldName: 'Ruang Kelas',
+                onNext: () => this.scene.start('MainMenu'),
+                nextLabel: 'Ke Main Menu»',
+            });
+        };
+        EventBus.on(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
+
     }
 
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {
         if (correct) this.updateIndicators();
     };
+
+
 
     override update(_time: number, delta: number): void {
         // Custom sort — wall selalu di belakang furniture
@@ -180,6 +200,7 @@ export default class ClassroomWorld extends BaseWorld {
         this.analogStick?.destroy();
         this.questionIndicators.forEach(i => i.destroy());
         this.questionIndicators = [];
+        EventBus.off(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
         super.shutdown();
     }
 
@@ -382,4 +403,6 @@ export default class ClassroomWorld extends BaseWorld {
 
         this.npcs = [this.pakGuru];
     }
+
+
 }

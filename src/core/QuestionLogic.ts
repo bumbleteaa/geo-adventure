@@ -81,8 +81,9 @@ export class QuestionLogic {
     // PUBLIC API — Inisialisasi
     // =========================================================================
 
-    async init(worldKey: string): Promise<void> {
-        const questions = await this._loadQuestions();
+    async init(worldKey: string, triggerIds: string[]): Promise<void> {
+        const all = await this._loadQuestions();
+        const questions = all.filter(q => triggerIds.includes(q.trigger_id));
 
         for (const q of questions) {
             const list = this._byTrigger.get(q.trigger_id) ?? [];

@@ -52,19 +52,6 @@
         ]
     },
     {
-        "id": "q_bedroom_02",
-        "trigger_id": "bedroom_q",
-        "teks_soal": "Meja belajarmu berbentuk persegi panjang. Panjangnya 120 cm dan lebarnya 60 cm. Berapa keliling meja itu?",
-        "jawaban": 360,
-        "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
-        "polya_steps": [
-            "Apa yang diketahui? Panjang = 120 cm, Lebar = 60 cm",
-            "Apa yang ditanyakan? Keliling meja belajar",
-            "Rumus apa yang dipakai? K = 2 × (p + l)",
-            "Hitung: 2 × (120 + 60) = ?"
-        ]
-    },
-    {
         "id": "q_home_01",
         "trigger_id": "home_q",
         "teks_soal": "Pot bunga di depan rumah berbentuk persegi dengan sisi 30 cm. Berapa keliling alas pot itu?",
@@ -75,32 +62,6 @@
             "Apa yang ditanyakan? Keliling alas pot",
             "Rumus apa yang dipakai? K = 4 × s",
             "Hitung: 4 × 30 = ?"
-        ]
-    },
-    {
-        "id": "q_classroom_01",
-        "trigger_id": "classroom_q",
-        "teks_soal": "Lantai kelas berbentuk persegi panjang. Panjangnya 9 meter dan lebarnya 7 meter. Berapa luas lantai kelas itu?",
-        "jawaban": 63,
-        "hint": "Luas persegi panjang = panjang × lebar",
-        "polya_steps": [
-            "Apa yang diketahui? Panjang = 9 m, Lebar = 7 m",
-            "Apa yang ditanyakan? Luas lantai kelas",
-            "Rumus apa yang dipakai? L = p × l",
-            "Hitung: 9 × 7 = ?"
-        ]
-    },
-    {
-        "id": "q_classroom_02",
-        "trigger_id": "classroom_q",
-        "teks_soal": "Jendela kelas berbentuk persegi dengan sisi 80 cm. Berapa keliling jendela itu?",
-        "jawaban": 320,
-        "hint": "Keliling persegi = 4 × sisi",
-        "polya_steps": [
-            "Apa yang diketahui? Sisi jendela = 80 cm",
-            "Apa yang ditanyakan? Keliling jendela kelas",
-            "Rumus apa yang dipakai? K = 4 × s",
-            "Hitung: 4 × 80 = ?"
         ]
     }
 ]

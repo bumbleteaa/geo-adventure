@@ -94,20 +94,12 @@ export class DialogManager {
      * Load soal via QuestionLogic dan mulai mendengarkan event.
      * Harus di-await dari SchoolWorld.create() sebelum player bisa berinteraksi.
      */
-    async init(worldKey: string): Promise<void> {
-        // QuestionLogic mengambil alih: fetch, indexing, dan GameState.registerWorld().
-        // DialogManager tidak perlu tahu format questions.json sama sekali.
-        await this._logic.init(worldKey);
+    async init(worldKey: string, triggerIds: string[]): Promise<void> {
+        await this._logic.init(worldKey, triggerIds);
         if (this._destroyed) return;
-        // Subscribe ke event internal QuestionLogic.
-        // Ini yang menghubungkan "sesi soal selesai" ke pelepasan _busy.
         this._logic.on(this._onQuestionEvent);
-
-        // Subscribe ke event dari world.
         EventBus.on(GameEvent.NPC_INTERACT, this._onNpcInteract);
         EventBus.on(GameEvent.TILE_TRIGGER_ENTERED, this._onTileTriggered);
-        console.log('[DM.init] registered | world:', worldKey,
-            '| TILE listeners:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
     }
 
     /**

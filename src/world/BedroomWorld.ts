@@ -110,7 +110,7 @@ export default class BedroomWorld extends BaseWorld {
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('BedroomWorld');
+        this.dialogManager.init('BedroomWorld', ['bedroom_q']);
 
         this.spawnQuestionIndicators();
 
@@ -143,11 +143,11 @@ export default class BedroomWorld extends BaseWorld {
         this.hud.show();
 
         this._onWorldComplete = ({ worldKey }) => {
-            if (worldKey !== 'HomeWorld') return;
+            if (worldKey !== 'BedroomWorld') return;
             WorldCompleteUI.show({
-                worldName: 'Rumah',
-                onNext: () => this.scene.start('ClassroomWorld'),
-                nextLabel: 'Ke Sekolah »',
+                worldName: 'Kamar',
+                onNext: () => this.scene.start('HomeWorld'),
+                nextLabel: 'Ke Halaman Rumah »',
             });
         };
         EventBus.on(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
