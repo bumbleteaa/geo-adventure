@@ -107,7 +107,7 @@ export class DialogUI {
         this._detachListeners();
         this._setVisible(false);
         this._onComplete = null;
-        this._completed = false;
+        //this._completed = false;
     }
 
     /**

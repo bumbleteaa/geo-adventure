@@ -128,7 +128,7 @@ export default class HomeWorld extends BaseWorld {
         Player.preloadAssets(this);
     }
 
-    override create(): void {
+    override async create(): Promise<void> {
         super.create();
 
         this.spawnPlayer();
@@ -173,8 +173,6 @@ export default class HomeWorld extends BaseWorld {
         EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
         EventBus.off(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
         this.dialogManager?.destroy();
-        this.dialogUI?.destroy();
-        this.questionUI?.destroy();
         this.triggerSystem?.destroy();
         this.triggerSystem = null;
         this.debugTexts.forEach(t => t.destroy());
@@ -243,7 +241,11 @@ export default class HomeWorld extends BaseWorld {
     }
 
     private updateIndicators(): void {
-        this.questionIndicators.forEach(i => i.setVisible(false));
+        for (const indicator of this.questionIndicators) {
+            if (this.dialogManager.isTileComplete('home_q')) {
+                indicator.setVisible(false);
+            }
+        }
     }
 
     // =========================================================================

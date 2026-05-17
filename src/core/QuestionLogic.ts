@@ -200,6 +200,8 @@ export class QuestionLogic {
         if (!this._session) return;
 
         const question = this._getActiveQuestion();
+
+        console.log('[QLogic] validateFinalAnswer | session:', this._session?.questionId, '| question found:', !!question);
         if (!question) return;
 
         const parsed = parseInt(inputText.trim(), 10);

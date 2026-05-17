@@ -65,6 +65,7 @@ export class DialogManager {
     // Guard untuk mencegah dua interaksi berjalan bersamaan.
     // Diset true di awal interaksi, dilepas saat SESSION_COMPLETE diterima.
     private _busy = false;
+    private _destroyed = false;
 
     // Referensi handler yang di-bind, diperlukan untuk cleanup di destroy().
     private readonly _onNpcInteract: (payload: { npcId: string; playerId: string }) => void;
@@ -97,7 +98,7 @@ export class DialogManager {
         // QuestionLogic mengambil alih: fetch, indexing, dan GameState.registerWorld().
         // DialogManager tidak perlu tahu format questions.json sama sekali.
         await this._logic.init(worldKey);
-
+        if (this._destroyed) return;
         // Subscribe ke event internal QuestionLogic.
         // Ini yang menghubungkan "sesi soal selesai" ke pelepasan _busy.
         this._logic.on(this._onQuestionEvent);
@@ -105,16 +106,24 @@ export class DialogManager {
         // Subscribe ke event dari world.
         EventBus.on(GameEvent.NPC_INTERACT, this._onNpcInteract);
         EventBus.on(GameEvent.TILE_TRIGGER_ENTERED, this._onTileTriggered);
+        console.log('[DM.init] registered | world:', worldKey,
+            '| TILE listeners:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
     }
 
     /**
      * Bersihkan semua listener. Panggil dari SchoolWorld.shutdown().
      */
     destroy(): void {
+        this._destroyed = true;
+
         this._logic.off(this._onQuestionEvent);
         EventBus.off(GameEvent.NPC_INTERACT, this._onNpcInteract);
         EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTileTriggered);
+        console.log('[DM.destroy] before off | count:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
+        EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTileTriggered);
+        console.log('[DM.destroy] after off  | count:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
         this._busy = false;
+        console.log('[DM.destroy] | TILE listeners after:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
     }
 
     /**
@@ -177,6 +186,7 @@ export class DialogManager {
      * Jika semua soal sudah selesai, tidak ada yang terjadi (tile diam saja).
      */
     private _handleTileInteract(triggerId: string): void {
+        console.log('[DM] _handleTileInteract | triggerId:', triggerId, '| busy:', this._busy);
         if (this._busy) return;
         if (!this._logic.hasRemaining(triggerId)) return;
 
@@ -204,32 +214,22 @@ export class DialogManager {
         switch (event.type) {
 
             case 'SESSION_STARTED':
-                // QuestionLogic sudah memilih soal yang tepat.
-                // DialogManager hanya perlu meneruskannya ke QuestionUI untuk dirender.
-                //
-                // CATATAN MIGRASI QuestionUI:
-                //   Signature show() perlu diubah dari:
-                //     show(question: Question, onCorrect: () => void)
-                //   Menjadi:
-                //     show(question: Question, logic: QuestionLogic)
-                //   Agar QuestionUI bisa memanggil logic.submitStep() dan logic.getHint()
-                //   sebagai ganti logika internalnya sendiri.
-                //   SESSION_COMPLETE dari QuestionLogic yang akan melepas _busy,
-                //   bukan callback dari QuestionUI.
-                this._question.show(event.question, this._logic);
+                // _busy dilepas hanya setelah QuestionUI benar-benar hilang dari layar,
+                // bukan saat SESSION_COMPLETE — supaya tidak ada interaksi baru
+                // yang bisa dimulai selama star animation / fade-out masih berjalan.
+                this._question.show(event.question, this._logic, () => {
+                    this._busy = false;
+                });
                 break;
 
             case 'SESSION_COMPLETE':
-                // Soal selesai (benar atau attempts habis) — QuestionLogic sudah
-                // memanggil GameState.markComplete() sebelum emit event ini.
-                // DialogManager cukup melepas guard-nya.
-                this._busy = false;
+                // Tidak perlu lepas _busy di sini.
+                // Sudah dihandle oleh onHidden callback di SESSION_STARTED.
                 break;
 
             case 'ALL_DONE':
-                // Fallback: startSession() dipanggil tapi tidak ada soal tersisa.
-                // Normalnya sudah dicegah oleh hasRemaining() di atas,
-                // tapi bisa terjadi kalau ada race condition atau state yang tidak konsisten.
+                // ALL_DONE tidak membuka QuestionUI sama sekali,
+                // jadi tidak ada onHidden callback — lepas _busy langsung.
                 this._busy = false;
                 break;
         }

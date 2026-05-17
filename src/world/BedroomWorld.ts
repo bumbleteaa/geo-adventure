@@ -7,6 +7,8 @@ import { DialogUI } from '../ui/DialogUI';
 import { QuestionUI } from '../ui/QuestionUI';
 import { TutorialUI } from '../ui/TutorialUI';
 import { DialogManager } from '../core/DialogManager';
+import { HudUI } from '../ui/HudUI';
+import { WorldCompleteUI } from '../ui/WorldCompleteUI';
 import type { TileNode, DecorConfig } from './WorldTypes';
 
 const BEDROOM_MAP: string[][] = [
@@ -64,6 +66,9 @@ export default class BedroomWorld extends BaseWorld {
     private dialogUI!: DialogUI;
     private questionUI!: QuestionUI;
     private dialogManager!: DialogManager;
+    private hud!: HudUI;
+    private _onWorldComplete!: (p: { worldKey: string }) => void;
+
 
     // Indicator dengan info triggerId-nya
     private questionIndicators: IndicatorEntry[] = [];
@@ -133,6 +138,20 @@ export default class BedroomWorld extends BaseWorld {
         this.game.canvas.focus();
 
         TutorialUI.showOnce(() => { this.game.canvas.focus(); })
+
+        this.hud = new HudUI();
+        this.hud.show();
+
+        this._onWorldComplete = ({ worldKey }) => {
+            if (worldKey !== 'HomeWorld') return;
+            WorldCompleteUI.show({
+                worldName: 'Rumah',
+                onNext: () => this.scene.start('ClassroomWorld'),
+                nextLabel: 'Ke Sekolah »',
+            });
+        };
+        EventBus.on(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
+
     }
 
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {
@@ -157,7 +176,11 @@ export default class BedroomWorld extends BaseWorld {
     }
 
     override shutdown(): void {
+
+        console.log('[BW.shutdown] before off | count:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
         EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
+        console.log('[BW.shutdown] after off  | count:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
+
         EventBus.off(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
         this.dialogManager?.destroy();
         this.dialogUI?.destroy();
@@ -167,6 +190,8 @@ export default class BedroomWorld extends BaseWorld {
         this.analogStick?.destroy();
         this.questionIndicators.forEach(e => e.indicator.destroy());
         this.questionIndicators = [];
+        EventBus.off(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
+        this.hud.destroy();
         super.shutdown();
     }
 

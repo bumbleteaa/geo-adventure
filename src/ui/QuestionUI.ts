@@ -30,6 +30,7 @@ export class QuestionUI {
     readonly btnHint: HTMLButtonElement;
     readonly btnSubmit: HTMLButtonElement;
     private readonly starsLayer: HTMLDivElement;
+    private _onHidden: (() => void) | null = null;
 
     // Session state (UI-only) 
 
@@ -342,7 +343,8 @@ export class QuestionUI {
      * Tidak ada lagi callback — DialogManager bereaksi ke SESSION_COMPLETE dari QuestionLogic,
      * bukan dari QuestionUI secara langsung.
      */
-    public show(question: Question, logic: QuestionLogic): void {
+    public show(question: Question, logic: QuestionLogic, onHidden?: () => void): void {
+        console.log('[QuestionUI.show] called | question:', question.id, '| still visible:', this._isVisible());
         if (this._isVisible()) this._clearState();
 
         this._question = question;
@@ -361,6 +363,7 @@ export class QuestionUI {
         this._setVisible(true);
 
         requestAnimationFrame(() => this.polyaInput.focus());
+        this._onHidden = onHidden ?? null;
     }
 
     public hide(): void {
@@ -382,9 +385,6 @@ export class QuestionUI {
     // =========================================================================
 
     private _clearState(): void {
-        // Penting: unsubscribe dari QuestionLogic sebelum null-kan referensi.
-        // Tanpa ini, handler yang sudah "mati" tetap terdaftar dan akan fire
-        // di sesi berikutnya → double-render dan potensi stale closure bug.
         if (this._logic && this._onQuestionEvent) {
             this._logic.off(this._onQuestionEvent);
         }
@@ -392,8 +392,12 @@ export class QuestionUI {
         this._onQuestionEvent = null;
         this._question = null;
         this._hintVisible = false;
-
         this._resetDom();
+
+        // Panggil SETELAH clear agar callback tidak melihat state lama
+        const cb = this._onHidden;
+        this._onHidden = null;
+        cb?.();
     }
 
     private _resetDom(): void {

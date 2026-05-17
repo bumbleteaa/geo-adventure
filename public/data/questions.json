@@ -102,31 +102,5 @@
             "Rumus apa yang dipakai? K = 4 × s",
             "Hitung: 4 × 80 = ?"
         ]
-    },
-    {
-        "id": "q_school_01",
-        "trigger_id": "school_q",
-        "teks_soal": "Tiang bendera di halaman sekolah berdiri di atas alas berbentuk persegi dengan sisi 50 cm. Berapa luas alas tiang bendera itu?",
-        "jawaban": 2500,
-        "hint": "Luas persegi = sisi × sisi",
-        "polya_steps": [
-            "Apa yang diketahui? Sisi alas = 50 cm",
-            "Apa yang ditanyakan? Luas alas tiang bendera",
-            "Rumus apa yang dipakai? L = s × s",
-            "Hitung: 50 × 50 = ?"
-        ]
-    },
-    {
-        "id": "q_school_02",
-        "trigger_id": "school_q",
-        "teks_soal": "Halaman upacara di sekolah berbentuk persegi panjang. Panjangnya 30 meter dan lebarnya 20 meter. Berapa keliling halaman upacara itu?",
-        "jawaban": 100,
-        "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
-        "polya_steps": [
-            "Apa yang diketahui? Panjang = 30 m, Lebar = 20 m",
-            "Apa yang ditanyakan? Keliling halaman upacara",
-            "Rumus apa yang dipakai? K = 2 × (p + l)",
-            "Hitung: 2 × (30 + 20) = ?"
-        ]
     }
 ]

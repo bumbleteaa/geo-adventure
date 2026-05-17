@@ -2,6 +2,8 @@
 
 import Phaser from 'phaser';
 import { TutorialUI } from './TutorialUI';
+import { MusicManager } from '../core/MusicEngine';
+MusicManager
 
 const SCENE_KEY = 'MainMenu';
 const TRANSITION_MS = 600;
@@ -14,6 +16,7 @@ export default class MainMenu extends Phaser.Scene {
 
     preload(): void {
         // this.load.image('menu_bg', 'assets/menu_bg.png');
+        MusicManager.preload(this);
     }
 
     create(): void {
@@ -286,6 +289,7 @@ export default class MainMenu extends Phaser.Scene {
         if (!overlay) return;
 
         overlay.style.pointerEvents = 'none';
+        MusicManager.play(this);
         overlay.classList.add('mm-exit');
 
         setTimeout(() => {

@@ -121,12 +121,20 @@ export const GameState = {
         _state = _freshState();
     },
 
-    debug(): void {
-        console.group('[GameState]');
-        console.log('completedQuestions:', _state.completedQuestions);
-        console.log('totalStars:', _state.totalStars);
-        console.log('completedWorlds:', _state.completedWorlds);
-        console.groupEnd();
+    debug(): {
+        totalStars: number;
+        completedCount: number;
+        totalQuestions: number;
+        maxStars: number;
+    } {
+        const totalQuestions = Array.from(_state.worldRegistry.values())
+            .reduce((sum, ids) => sum + ids.size, 0);
+        return {
+            totalStars: _state.totalStars,
+            completedCount: _state.completedQuestions.size,
+            totalQuestions,
+            maxStars: totalQuestions * 3,
+        };
     },
 
 } as const;
