@@ -337,6 +337,9 @@ export default class MainMenu extends Phaser.Scene {
         const overlay = this._overlay;
         if (!overlay) return;
 
+        // Lepas pointer events SEGERA
+        overlay.style.pointerEvents = 'none';
+
         // Tambah class exit untuk animasi fade-out
         overlay.classList.add('mm-exit');
 

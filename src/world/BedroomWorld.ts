@@ -99,6 +99,7 @@ export default class BedroomWorld extends BaseWorld {
         super.create();
 
         this.spawnPlayer();
+        console.log('player spawn at:', this.player.tileX, this.player.tileY);
 
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
@@ -114,6 +115,12 @@ export default class BedroomWorld extends BaseWorld {
         );
 
         this._onTrigger = ({ triggerId }) => {
+            this._onTrigger = ({ triggerId }) => {
+                console.log('trigger fired:', triggerId); // ← tambah ini
+                if (triggerId === 'portal_to_home') {
+                    this.scene.start('HomeWorld');
+                }
+            };
             if (triggerId === 'portal_to_home') {
                 this.scene.start('HomeWorld');
             }
@@ -121,6 +128,8 @@ export default class BedroomWorld extends BaseWorld {
 
         EventBus.on(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
         EventBus.on(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
+
+        this.game.canvas.focus();
     }
 
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {
