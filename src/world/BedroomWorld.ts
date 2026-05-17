@@ -5,6 +5,7 @@ import { TileTriggerSystem, type TileTriggerRegistry } from '../core/TileTrigger
 import { EventBus, GameEvent } from '../core/EventBus';
 import { DialogUI } from '../ui/DialogUI';
 import { QuestionUI } from '../ui/QuestionUI';
+import { TutorialUI } from '../ui/TutorialUI';
 import { DialogManager } from '../core/DialogManager';
 import type { TileNode, DecorConfig } from './WorldTypes';
 
@@ -130,6 +131,8 @@ export default class BedroomWorld extends BaseWorld {
         EventBus.on(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
 
         this.game.canvas.focus();
+
+        TutorialUI.showOnce(() => { this.game.canvas.focus(); })
     }
 
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {

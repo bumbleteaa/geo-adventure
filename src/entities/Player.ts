@@ -1,25 +1,10 @@
 // main character controlled by the player, with movement, interaction, and inventory management. The player can move around the world, interact with items and NPCs, and progress through the story. The player will have a simple inventory system to keep track of items they have collected, which can be used to solve puzzles or progress through the story. The player can also have a health or energy system that adds an element of challenge to the game, requiring them to manage their resources carefully as they explore the world and interact with its inhabitants.
-
-/**
- * Player.ts
- * src/entities/Player.ts
- *
- * UNDER THE HOOD — responsibility boundary:
- * Player.ts owns three things only:
- *   1. Reading virtual analog input and translating it to moveInDirection()
- *   2. Loading and playing the correct animation for each direction + state
- *   3. Defining what happens when the player is interacted with (nothing, for now)
- *
- * It does NOT own: tile walkability checks, scene transitions, camera follow.
- * Those belong to BaseWorld and HomeWorld respectively.
- */
-
 import Phaser from 'phaser';
 import { BaseEntity } from './BaseEntity';
 import { Direction, InteractionResult } from './EntityType';
 import type { EntityConfig } from './EntityType';
 
-// ─── Sprite Constants ─────────────────────────────────────────────────────────
+// Sprite Constants 
 // UNDER THE HOOD: centralise all sprite measurements here.
 // If your frame size differs, change ONLY these two lines — nothing else breaks.
 const FRAME_WIDTH = 48; // pixels per frame, horizontal
@@ -51,7 +36,7 @@ const MIN_ANIM_SCALE = 0.3;
 const animKey = (state: 'idle' | 'walk', dir: Direction): string =>
     `player_${state}_${dir}`;
 
-// ─── Analog Input Interface ───────────────────────────────────────────────────
+// Analog Input Interface
 // UNDER THE HOOD: Player.ts doesn't care how the joystick is implemented —
 // physical gamepad, touch virtual stick, or keyboard emulation.
 // Anything that satisfies this interface can drive the player.
@@ -138,7 +123,7 @@ export class Player extends BaseEntity {
     // ! TICK — called every frame by the scene's update()
     // =========================================================================
 
-    /* *
+    /* 
     * UNDER THE HOOD — updated pipeline:
      *
      * 1. Read analog vector (screen-space, normalised)
@@ -263,14 +248,12 @@ export class Player extends BaseEntity {
 
     /* *
      * Convert a normalised analog vector to the nearest isometric Direction.
-     *
      * UNDER THE HOOD — the 8-sector mapping:
      * We divide the 360° input space into 8 sectors of 45° each.
      * atan2(y, x) gives us the angle in radians from the positive x-axis.
      * We convert to degrees and rotate by 22.5° so sector boundaries fall
      * between the cardinal/diagonal directions — giving each direction an
      * equal 45° window. Returns null if the vector magnitude is below deadzone.
-     *
      *         NW   N   NE
      *           \  |  /
      *        W --[you]-- E
