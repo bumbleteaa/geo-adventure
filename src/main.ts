@@ -3,6 +3,7 @@ import SchoolWorld from './world/SchoolWorld';
 import HomeWorld from './world/HomeWorld';
 import BedroomWorld from './world/BedroomWorld';
 import ClassroomWorld from './world/ClassroomWorld';
+import MainMenu from './ui/MainMenu';
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -15,7 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.RESIZE, // Biar pas di semua ukuran layar HP
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [BedroomWorld, HomeWorld, ClassroomWorld], // Kita masukin MeadowWorld sebagai scene pertama
+    scene: [MainMenu, BedroomWorld, HomeWorld, ClassroomWorld], // Kita masukin MeadowWorld sebagai scene pertama
     physics: {
         default: 'arcade',
         arcade: {

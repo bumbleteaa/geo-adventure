@@ -95,7 +95,7 @@ export default class BedroomWorld extends BaseWorld {
         Player.preloadAssets(this);
     }
 
-    override create(): void {
+    override async create(): Promise<void> {
         super.create();
 
         this.spawnPlayer();
