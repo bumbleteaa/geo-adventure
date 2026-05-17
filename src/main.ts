@@ -1,5 +1,4 @@
 import 'phaser';
-import SchoolWorld from './world/SchoolWorld';
 import HomeWorld from './world/HomeWorld';
 import BedroomWorld from './world/BedroomWorld';
 import ClassroomWorld from './world/ClassroomWorld';
