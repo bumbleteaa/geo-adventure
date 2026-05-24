@@ -1,67 +1,487 @@
 [
     {
-        "id": "q_guru_01",
-        "trigger_id": "pak_guru",
-        "teks_soal": "Ruang kelas kita panjangnya 9 meter dan lebarnya 7 meter. Berapa luas ruang kelas itu?",
+        "id": "q_classroom_01",
+        "trigger_id": "classroom_q",
+        "order": 1,
+        "topic": "luas",
+        "shape": "persegi_panjang",
+        "teks_soal": "Lantai ruang kelas berbentuk persegi panjang. Panjangnya 9 meter dan lebarnya 7 meter. Berapa luas lantai ruang kelas itu?",
         "jawaban": 63,
         "hint": "Luas persegi panjang = panjang × lebar",
+        "guiding_questions": [
+            "Berbentuk apakah lantai ruang kelas itu?",
+            "Apa yang dimaksud dengan luas?",
+            "Ukuran apa saja yang sudah diketahui dari soal?"
+        ],
         "polya_steps": [
-            "Apa yang diketahui? Panjang = 9 m, Lebar = 7 m",
-            "Apa yang ditanyakan? Luas ruang kelas",
-            "Rumus apa yang dipakai? L = p × l",
-            "Hitung: 9 × 7 = ?"
+            {
+                "phase": 1,
+                "label": "Memahami Masalah",
+                "sub_steps": [
+                    {
+                        "prompt": "Berbentuk apa lantai ruang kelas itu?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Persegi panjang",
+                            "Persegi",
+                            "Segitiga",
+                            "Lingkaran"
+                        ],
+                        "expected": "Persegi panjang"
+                    },
+                    {
+                        "prompt": "Berapa panjang lantai itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 9
+                    },
+                    {
+                        "prompt": "Berapa lebar lantai itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 7
+                    },
+                    {
+                        "prompt": "Apa yang ditanyakan soal ini?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Luas lantai",
+                            "Keliling lantai",
+                            "Panjang lantai"
+                        ],
+                        "expected": "Luas lantai"
+                    }
+                ]
+            },
+            {
+                "phase": 2,
+                "label": "Membuat Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Rumus apa yang kamu gunakan untuk menghitung luas?",
+                        "input_type": "choice",
+                        "choices": [
+                            "L = p × l",
+                            "K = 2 × (p + l)",
+                            "L = s × s"
+                        ]
+                    }
+                ]
+            },
+            {
+                "phase": 3,
+                "label": "Melaksanakan Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Hitung sekarang! Berapa luas lantai ruang kelas itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "validates_answer": true
+                    }
+                ]
+            },
+            {
+                "phase": 4,
+                "label": "Memeriksa Kembali",
+                "sub_steps": [
+                    {
+                        "prompt": "Satuan yang benar untuk luas adalah...",
+                        "input_type": "choice",
+                        "choices": [
+                            "m²",
+                            "m",
+                            "cm",
+                            "cm²"
+                        ],
+                        "expected": "m²"
+                    }
+                ]
+            }
         ]
     },
     {
-        "id": "q_guru_02",
-        "trigger_id": "pak_guru",
-        "teks_soal": "Papan tulis di depan kelas panjangnya 3 meter dan lebarnya 1 meter. Berapa luas papan tulis itu?",
+        "id": "q_classroom_02",
+        "trigger_id": "classroom_q",
+        "order": 2,
+        "topic": "luas",
+        "shape": "persegi_panjang",
+        "teks_soal": "Papan tulis di depan kelas berbentuk persegi panjang. Panjangnya 3 meter dan lebarnya 1 meter. Berapa luas papan tulis itu?",
         "jawaban": 3,
         "hint": "Luas persegi panjang = panjang × lebar",
+        "guiding_questions": [
+            "Berbentuk apakah papan tulis itu?",
+            "Apa yang dimaksud dengan luas?",
+            "Berapa ukuran panjang dan lebar papan tulis?"
+        ],
         "polya_steps": [
-            "Apa yang diketahui? Panjang = 3 m, Lebar = 1 m",
-            "Apa yang ditanyakan? Luas papan tulis",
-            "Rumus apa yang dipakai? L = p × l",
-            "Hitung: 3 × 1 = ?"
+            {
+                "phase": 1,
+                "label": "Memahami Masalah",
+                "sub_steps": [
+                    {
+                        "prompt": "Berbentuk apa papan tulis itu?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Persegi panjang",
+                            "Persegi",
+                            "Segitiga",
+                            "Lingkaran"
+                        ],
+                        "expected": "Persegi panjang"
+                    },
+                    {
+                        "prompt": "Berapa panjang papan tulis itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 3
+                    },
+                    {
+                        "prompt": "Berapa lebar papan tulis itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 1
+                    },
+                    {
+                        "prompt": "Apa yang ditanyakan soal ini?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Luas papan tulis",
+                            "Keliling papan tulis",
+                            "Panjang papan tulis"
+                        ],
+                        "expected": "Luas papan tulis"
+                    }
+                ]
+            },
+            {
+                "phase": 2,
+                "label": "Membuat Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Rumus apa yang kamu gunakan untuk menghitung luas?",
+                        "input_type": "choice",
+                        "choices": [
+                            "L = p × l",
+                            "K = 2 × (p + l)",
+                            "L = s × s"
+                        ]
+                    }
+                ]
+            },
+            {
+                "phase": 3,
+                "label": "Melaksanakan Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Hitung sekarang! Berapa luas papan tulis itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "validates_answer": true
+                    }
+                ]
+            },
+            {
+                "phase": 4,
+                "label": "Memeriksa Kembali",
+                "sub_steps": [
+                    {
+                        "prompt": "Satuan yang benar untuk luas adalah...",
+                        "input_type": "choice",
+                        "choices": [
+                            "m²",
+                            "m",
+                            "cm",
+                            "cm²"
+                        ],
+                        "expected": "m²"
+                    }
+                ]
+            }
         ]
     },
     {
-        "id": "q_guru_03",
-        "trigger_id": "pak_guru",
-        "teks_soal": "Ruang kelas panjangnya 9 meter dan lebarnya 7 meter. Berapa keliling ruang kelas itu?",
+        "id": "q_classroom_03",
+        "trigger_id": "classroom_q",
+        "order": 3,
+        "topic": "keliling",
+        "shape": "persegi_panjang",
+        "teks_soal": "Ruang kelas berbentuk persegi panjang dengan panjang 9 meter dan lebar 7 meter. Berapa keliling ruang kelas itu?",
         "jawaban": 32,
         "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
+        "guiding_questions": [
+            "Berbentuk apakah ruang kelas itu?",
+            "Apa yang dimaksud dengan keliling?",
+            "Berapa ukuran panjang dan lebarnya?"
+        ],
         "polya_steps": [
-            "Apa yang diketahui? Panjang = 9 m, Lebar = 7 m",
-            "Apa yang ditanyakan? Keliling ruang kelas",
-            "Rumus apa yang dipakai? K = 2 × (p + l)",
-            "Hitung: 2 × (9 + 7) = ?"
+            {
+                "phase": 1,
+                "label": "Memahami Masalah",
+                "sub_steps": [
+                    {
+                        "prompt": "Berbentuk apa ruang kelas itu?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Persegi panjang",
+                            "Persegi",
+                            "Segitiga",
+                            "Lingkaran"
+                        ],
+                        "expected": "Persegi panjang"
+                    },
+                    {
+                        "prompt": "Berapa panjang ruang kelas? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 9
+                    },
+                    {
+                        "prompt": "Berapa lebar ruang kelas? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 7
+                    },
+                    {
+                        "prompt": "Apa yang ditanyakan soal ini?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Keliling ruang kelas",
+                            "Luas ruang kelas",
+                            "Panjang ruang kelas"
+                        ],
+                        "expected": "Keliling ruang kelas"
+                    }
+                ]
+            },
+            {
+                "phase": 2,
+                "label": "Membuat Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Rumus apa yang kamu gunakan untuk menghitung keliling?",
+                        "input_type": "choice",
+                        "choices": [
+                            "K = 2 × (p + l)",
+                            "L = p × l",
+                            "K = 4 × s"
+                        ]
+                    }
+                ]
+            },
+            {
+                "phase": 3,
+                "label": "Melaksanakan Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Hitung sekarang! Berapa keliling ruang kelas itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "validates_answer": true
+                    }
+                ]
+            },
+            {
+                "phase": 4,
+                "label": "Memeriksa Kembali",
+                "sub_steps": [
+                    {
+                        "prompt": "Satuan yang benar untuk keliling adalah...",
+                        "input_type": "choice",
+                        "choices": [
+                            "m",
+                            "m²",
+                            "cm²",
+                            "km"
+                        ],
+                        "expected": "m"
+                    }
+                ]
+            }
         ]
     },
     {
         "id": "q_bedroom_01",
         "trigger_id": "bedroom_q",
+        "order": 1,
+        "topic": "luas",
+        "shape": "persegi_panjang",
         "teks_soal": "Kasur di kamarmu berbentuk persegi panjang. Panjangnya 2 meter dan lebarnya 1 meter. Berapa luas kasur itu?",
         "jawaban": 2,
         "hint": "Luas persegi panjang = panjang × lebar",
+        "guiding_questions": [
+            "Berbentuk apakah kasur itu?",
+            "Apa yang dimaksud dengan luas?",
+            "Berapa ukuran panjang dan lebar kasur?"
+        ],
         "polya_steps": [
-            "Apa yang diketahui? Panjang = 2 m, Lebar = 1 m",
-            "Apa yang ditanyakan? Luas kasur",
-            "Rumus apa yang dipakai? L = p × l",
-            "Hitung: 2 × 1 = ?"
+            {
+                "phase": 1,
+                "label": "Memahami Masalah",
+                "sub_steps": [
+                    {
+                        "prompt": "Berbentuk apa kasur itu?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Persegi panjang",
+                            "Persegi",
+                            "Segitiga",
+                            "Lingkaran"
+                        ],
+                        "expected": "Persegi panjang"
+                    },
+                    {
+                        "prompt": "Berapa panjang kasur itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 2
+                    },
+                    {
+                        "prompt": "Berapa lebar kasur itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 1
+                    },
+                    {
+                        "prompt": "Apa yang ditanyakan soal ini?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Luas kasur",
+                            "Keliling kasur",
+                            "Panjang kasur"
+                        ],
+                        "expected": "Luas kasur"
+                    }
+                ]
+            },
+            {
+                "phase": 2,
+                "label": "Membuat Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Rumus apa yang kamu gunakan untuk menghitung luas?",
+                        "input_type": "choice",
+                        "choices": [
+                            "L = p × l",
+                            "K = 2 × (p + l)",
+                            "L = s × s"
+                        ]
+                    }
+                ]
+            },
+            {
+                "phase": 3,
+                "label": "Melaksanakan Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Hitung sekarang! Berapa luas kasur itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "validates_answer": true
+                    }
+                ]
+            },
+            {
+                "phase": 4,
+                "label": "Memeriksa Kembali",
+                "sub_steps": [
+                    {
+                        "prompt": "Satuan yang benar untuk luas adalah...",
+                        "input_type": "choice",
+                        "choices": [
+                            "m²",
+                            "m",
+                            "cm",
+                            "cm²"
+                        ],
+                        "expected": "m²"
+                    }
+                ]
+            }
         ]
     },
     {
         "id": "q_home_01",
         "trigger_id": "home_q",
-        "teks_soal": "Pot bunga di depan rumah berbentuk persegi dengan sisi 30 cm. Berapa keliling alas pot itu?",
-        "jawaban": 120,
-        "hint": "Keliling persegi = 4 × sisi",
+        "order": 1,
+        "topic": "keliling",
+        "shape": "persegi_panjang",
+        "teks_soal": "Taman di depan rumah berbentuk persegi panjang. Panjangnya 5 meter dan lebarnya 3 meter. Berapa keliling taman itu?",
+        "jawaban": 16,
+        "hint": "Keliling persegi panjang = 2 × (panjang + lebar)",
+        "guiding_questions": [
+            "Berbentuk apakah taman itu?",
+            "Apa yang dimaksud dengan keliling?",
+            "Berapa ukuran panjang dan lebar taman?"
+        ],
         "polya_steps": [
-            "Apa yang diketahui? Sisi pot = 30 cm",
-            "Apa yang ditanyakan? Keliling alas pot",
-            "Rumus apa yang dipakai? K = 4 × s",
-            "Hitung: 4 × 30 = ?"
+            {
+                "phase": 1,
+                "label": "Memahami Masalah",
+                "sub_steps": [
+                    {
+                        "prompt": "Berbentuk apa taman itu?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Persegi panjang",
+                            "Persegi",
+                            "Segitiga",
+                            "Lingkaran"
+                        ],
+                        "expected": "Persegi panjang"
+                    },
+                    {
+                        "prompt": "Berapa panjang taman itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 5
+                    },
+                    {
+                        "prompt": "Berapa lebar taman itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "expected": 3
+                    },
+                    {
+                        "prompt": "Apa yang ditanyakan soal ini?",
+                        "input_type": "choice",
+                        "choices": [
+                            "Keliling taman",
+                            "Luas taman",
+                            "Panjang taman"
+                        ],
+                        "expected": "Keliling taman"
+                    }
+                ]
+            },
+            {
+                "phase": 2,
+                "label": "Membuat Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Rumus apa yang kamu gunakan untuk menghitung keliling?",
+                        "input_type": "choice",
+                        "choices": [
+                            "K = 2 × (p + l)",
+                            "L = p × l",
+                            "K = 4 × s"
+                        ]
+                    }
+                ]
+            },
+            {
+                "phase": 3,
+                "label": "Melaksanakan Rencana",
+                "sub_steps": [
+                    {
+                        "prompt": "Hitung sekarang! Berapa keliling taman itu? (tulis angka saja)",
+                        "input_type": "number",
+                        "validates_answer": true
+                    }
+                ]
+            },
+            {
+                "phase": 4,
+                "label": "Memeriksa Kembali",
+                "sub_steps": [
+                    {
+                        "prompt": "Satuan yang benar untuk keliling adalah...",
+                        "input_type": "choice",
+                        "choices": [
+                            "m",
+                            "m²",
+                            "cm²",
+                            "km"
+                        ],
+                        "expected": "m"
+                    }
+                ]
+            }
         ]
     }
 ]

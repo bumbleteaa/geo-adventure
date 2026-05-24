@@ -1,0 +1,52 @@
+[
+    {
+        "id": "explore_keliling",
+        "trigger_id": "explore_keliling",
+        "topic": "keliling",
+        "title": "Apa itu Keliling?",
+        "steps": [
+            {
+                "type": "narrative",
+                "prompt": "Bayangkan kamu mau memasang pagar di sekeliling kebun. Panjang semua sisi yang mengelilingi bangun itu disebut KELILING.",
+                "icon": "🏡"
+            },
+            {
+                "type": "perimeter_trace",
+                "prompt": "Ketuk setiap sisi persegi panjang ini untuk menelusuri kelilingnya!",
+                "rect_w": 6,
+                "rect_h": 4,
+                "unit": "m"
+            },
+            {
+                "type": "narrative",
+                "prompt": "Keren! Kamu sudah menelusuri semua sisinya.\n\nKeliling = p + l + p + l\n            = 2 × (p + l)",
+                "icon": "🎉"
+            }
+        ]
+    },
+    {
+        "id": "explore_luas",
+        "trigger_id": "explore_luas",
+        "topic": "luas",
+        "title": "Apa itu Luas?",
+        "steps": [
+            {
+                "type": "narrative",
+                "prompt": "Bayangkan lantai kamarmu mau ditutupi dengan ubin kecil. Banyaknya ubin yang diperlukan untuk menutupi seluruh permukaan itulah yang disebut LUAS.",
+                "icon": "🟦"
+            },
+            {
+                "type": "area_fill",
+                "prompt": "Ketuk setiap kotak untuk menutupi persegi panjang ini!",
+                "grid_cols": 4,
+                "grid_rows": 3,
+                "unit": "m²"
+            },
+            {
+                "type": "narrative",
+                "prompt": "Bagus! Kamu butuh 12 kotak untuk menutupinya.\n\n4 kolom × 3 baris = 12 kotak\n\nLuas = p × l",
+                "icon": "🎉"
+            }
+        ]
+    }
+]

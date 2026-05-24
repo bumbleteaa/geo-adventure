@@ -7,12 +7,15 @@ import { EventBus, GameEvent } from '../core/EventBus';
 import { TileTriggerSystem, type TileTriggerRegistry } from '../core/TileTriggerSystem';
 import { DialogUI } from '../ui/DialogUI';
 import { QuestionUI } from '../ui/QuestionUI';
+import { ExplorationUI } from '../ui/ExplorationUI';
 import { DialogManager } from '../core/DialogManager';
+import { ExplorationManager } from '../core/ExplorationManager';
 import { HudUI } from '../ui/HudUI';
 import { WorldCompleteUI } from '../ui/WorldCompleteUI';
 
 // =============================================================================
 // TILE MAP — 11×11
+// E di (4,7) — tile eksplorasi keliling, di jalur utama dekat taman
 // =============================================================================
 
 const HOME_MAP: string[][] = [
@@ -24,7 +27,7 @@ const HOME_MAP: string[][] = [
     /* ty 4 */['FL', 'FL', 'G', 'G', 'G', 'G', 'G', 'F', 'F', 'F', 'G'],
     /* ty 5 */['FL', 'FL', 'G', 'FL', 'FL', '<', 'G', 'F', 'F', 'F', 'G'],
     /* ty 6 */['P1', 'P1', 'P2', 'P1', 'P1', 'P2', 'P2', 'P1', 'P1', 'P1', 'P2'],
-    /* ty 7 */['>', 'P2', 'P1', 'P2', 'P2', 'P1', 'P2', 'P2', 'Q', 'P2', 'P1'],
+    /* ty 7 */['>', 'P2', 'P1', 'P2', 'E', 'P1', 'P2', 'P2', 'Q', 'P2', 'P1'],
     /* ty 8 */['NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'G'],
     /* ty 9 */['NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'NF', 'G'],
     /* ty10 */['G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', 'G'],
@@ -52,6 +55,7 @@ const TILE_DEFS: Record<string, TileDef> = {
     '>': { texture: 'pave-tiles-2', assetPath: 'assets/pave_tiles_2.png', walkable: true },
     '<': { texture: 'pave-tiles-1', assetPath: 'assets/pave_tiles_1.png', walkable: true },
     Q: { texture: 'pave-tiles-1', assetPath: 'assets/pave_tiles_1.png', walkable: true },
+    E: { texture: 'pave-tiles-1', assetPath: 'assets/pave_tiles_1.png', walkable: true },
 };
 
 // =============================================================================
@@ -62,7 +66,24 @@ const HOME_TRIGGERS: TileTriggerRegistry = {
     '>': 'portal_to_classroom',
     '<': 'portal_to_bedroom',
     'Q': 'home_q',
+    'E': 'explore_keliling',
 };
+
+const TILE_TRIGGER_MAP: Record<string, string> = {
+    'Q': 'home_q',
+    'E': 'explore_keliling',
+};
+
+// =============================================================================
+// INDICATOR COLORS
+// =============================================================================
+
+const TOPIC_INDICATOR_COLOR: Record<'keliling' | 'luas', string> = {
+    keliling: '#f5a623',
+    luas: '#4a90e2',
+};
+const DEFAULT_INDICATOR_COLOR = '#9bd009';
+const EXPLORE_INDICATOR_COLOR = '#9b59b6';  // ungu — exploration tile
 
 // =============================================================================
 // HELPERS
@@ -78,6 +99,12 @@ const defOf = (cell: string): TileDef =>
 // HOME WORLD
 // =============================================================================
 
+interface IndicatorEntry {
+    indicator: Phaser.GameObjects.Text;
+    triggerId: string;
+    tileType: 'Q' | 'E';
+}
+
 export default class HomeWorld extends BaseWorld {
 
     private player!: Player;
@@ -88,13 +115,18 @@ export default class HomeWorld extends BaseWorld {
     private debugVisible = false;
 
     private triggerSystem: TileTriggerSystem | null = null;
+
     private dialogUI!: DialogUI;
     private questionUI!: QuestionUI;
     private dialogManager!: DialogManager;
+
+    private explorationUI!: ExplorationUI;
+    private explorationManager!: ExplorationManager;
+
     private hud!: HudUI;
     private _onWorldComplete!: (p: { worldKey: string }) => void;
 
-    private questionIndicators: Phaser.GameObjects.Text[] = [];
+    private questionIndicators: IndicatorEntry[] = [];
 
     private _onTrigger!: (p: { triggerId: string; tx: number; ty: number; entityId: string }) => void;
 
@@ -119,8 +151,6 @@ export default class HomeWorld extends BaseWorld {
             tryLoad(def.texture, def.assetPath);
         }
 
-
-        //Decor asset loader
         this.load.image('flower', 'assets/tile_041.png');
         this.load.image('tree', 'assets/tile_116.png');
         this.load.image('cherry-tree', 'assets/cherry_tree.png');
@@ -138,12 +168,23 @@ export default class HomeWorld extends BaseWorld {
         this.spawnPlayer();
         this.hud = new HudUI();
         this.hud.show();
-        this.spawnQuestionIndicators();
 
+        // ── Question system ───────────────────────────────────────────────────
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('HomeWorld', ['home_q']);
+        this.dialogManager.init('HomeWorld', ['home_q']).then(() => {
+            this.spawnQuestionIndicators();
+        });
+
+        // ── Exploration system ────────────────────────────────────────────────
+        this.explorationUI = new ExplorationUI();
+        this.explorationManager = new ExplorationManager(this.explorationUI);
+        this.explorationManager.init(['explore_keliling'], () => {
+            this.updateIndicators();
+        }).then(() => {
+            this.spawnExplorationIndicators();
+        });
 
         this.triggerSystem = new TileTriggerSystem(
             this.grid,
@@ -188,18 +229,26 @@ export default class HomeWorld extends BaseWorld {
     override shutdown(): void {
         EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
         EventBus.off(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
-        EventBus.off(GameEvent.WORLD_COMPLETE, this._onWorldComplete);  // ← naik ke sini
+        EventBus.off(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
+
         this.dialogManager?.destroy();
         this.dialogUI?.destroy();
         this.questionUI?.destroy();
+
+        this.explorationManager?.destroy();
+        this.explorationUI?.destroy();
+
         this.hud?.destroy();
         this.triggerSystem?.destroy();
         this.triggerSystem = null;
+
         this.debugTexts.forEach(t => t.destroy());
         this.debugTexts = [];
         this.debugGraphics?.destroy();
-        this.questionIndicators.forEach(i => i.destroy());
+
+        this.questionIndicators.forEach(e => e.indicator.destroy());
         this.questionIndicators = [];
+
         this.analogStick?.destroy();
         super.shutdown();
     }
@@ -227,44 +276,78 @@ export default class HomeWorld extends BaseWorld {
     }
 
     // =========================================================================
-    // QUESTION INDICATORS
+    // INDICATORS
     // =========================================================================
 
     private spawnQuestionIndicators(): void {
         for (let ty = 0; ty < this.worldSize; ty++) {
             for (let tx = 0; tx < this.worldSize; tx++) {
-                if (cellAt(tx, ty) !== 'Q') continue;
+                const cell = cellAt(tx, ty);
+                if (cell !== 'Q') continue;
 
+                const triggerId = TILE_TRIGGER_MAP[cell];
                 const tile = this.getTileNode(tx, ty);
-                if (!tile) continue;
+                if (!tile || !triggerId) continue;
 
-                const indicator = this.add.text(
-                    tile.worldX,
-                    tile.worldY + 12,
-                    '!',
-                    {
-                        fontSize: '14px',
-                        fontFamily: 'monospace',
-                        color: '#ffffff',
-                        backgroundColor: '#9bd009',
-                        padding: { x: 5, y: 2 },
-                        resolution: 2,
-                    }
-                )
-                    .setOrigin(0.5, 1)
-                    .setDepth(10_000);
+                const topic = this.dialogManager.getTopicForTrigger(triggerId);
+                const color = topic
+                    ? TOPIC_INDICATOR_COLOR[topic]
+                    : DEFAULT_INDICATOR_COLOR;
 
-                this.entityLayer.add(indicator);
-                this.questionIndicators.push(indicator);
+                const indicator = this._makeIndicator(tile, '!', color);
+                this.questionIndicators.push({ indicator, triggerId, tileType: 'Q' });
             }
         }
     }
 
-    private updateIndicators(): void {
-        for (const indicator of this.questionIndicators) {
-            if (this.dialogManager.isTileComplete('home_q')) {
-                indicator.setVisible(false);
+    private spawnExplorationIndicators(): void {
+        for (let ty = 0; ty < this.worldSize; ty++) {
+            for (let tx = 0; tx < this.worldSize; tx++) {
+                const cell = cellAt(tx, ty);
+                if (cell !== 'E') continue;
+
+                const triggerId = TILE_TRIGGER_MAP[cell];
+                const tile = this.getTileNode(tx, ty);
+                if (!tile || !triggerId) continue;
+
+                const indicator = this._makeIndicator(tile, '?', EXPLORE_INDICATOR_COLOR);
+                this.questionIndicators.push({ indicator, triggerId, tileType: 'E' });
             }
+        }
+    }
+
+    private _makeIndicator(
+        tile: TileNode,
+        char: string,
+        color: string,
+    ): Phaser.GameObjects.Text {
+        const indicator = this.add.text(
+            tile.worldX,
+            tile.worldY + 12,
+            char,
+            {
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                color: '#ffffff',
+                backgroundColor: color,
+                padding: { x: 5, y: 2 },
+                resolution: 2,
+            }
+        )
+            .setOrigin(0.5, 1)
+            .setDepth(10_000);
+
+        this.entityLayer.add(indicator);
+        return indicator;
+    }
+
+    private updateIndicators(): void {
+        for (const entry of this.questionIndicators) {
+            const done = entry.tileType === 'Q'
+                ? this.dialogManager.isTileComplete(entry.triggerId)
+                : this.explorationManager.isComplete(entry.triggerId);
+
+            if (done) entry.indicator.setVisible(false);
         }
     }
 

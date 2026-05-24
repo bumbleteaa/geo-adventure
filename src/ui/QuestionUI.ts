@@ -1,55 +1,47 @@
 // src/ui/QuestionUI.ts
-//
-// Pure renderer untuk sesi soal Polya.
 
-import { QuestionLogic, type QuestionEvent, type Question } from '../core/QuestionLogic'
-// =============================================================================
-// CONSTANTS
-// =============================================================================
+import { QuestionLogic, type QuestionEvent, type Question, type PolyaSubStep } from '../core/QuestionLogic';
 
 const ANIM_DURATION_MS = 200;
 const POST_CORRECT_DELAY_MS = 1800;
+const SOFT_REVEAL_ADVANCE_MS = 2000;
 const STAR_CHARS = ['⭐', '✨', '🌟', '💫'];
-
-// =============================================================================
-// CLASS
-// =============================================================================
 
 export class QuestionUI {
 
-    // DOM elements 
+    // DOM — structural
     private readonly backdrop: HTMLDivElement;
     private readonly panel: HTMLDivElement;
+    private readonly guidingView: HTMLDivElement;
+    private readonly questionView: HTMLDivElement;
+    private readonly starsLayer: HTMLDivElement;
+
+    // DOM — question view internals
+    private readonly stepDotsRow: HTMLDivElement;
+    private readonly stepLabel: HTMLSpanElement;
+    private readonly subStepCounter: HTMLSpanElement;
     private readonly soalText: HTMLParagraphElement;
     private readonly polyaCard: HTMLDivElement;
     private readonly polyaPrompt: HTMLParagraphElement;
     readonly polyaInput: HTMLInputElement;
-    private readonly stepDots: HTMLDivElement;
-    private readonly stepLabel: HTMLSpanElement;
+    private readonly choicesContainer: HTMLDivElement;
     private readonly feedbackArea: HTMLDivElement;
     readonly btnHint: HTMLButtonElement;
     readonly btnSubmit: HTMLButtonElement;
-    private readonly starsLayer: HTMLDivElement;
-    private _onHidden: (() => void) | null = null;
 
-    // Session state (UI-only) 
-
+    // State
     private _question: Question | null = null;
-    private _hintVisible: boolean = false;
+    private _hintVisible = false;
+    private _currentStep = 0;
+    private _currentSubStep = 0;
+    private _onHidden: (() => void) | null = null;
+    private _softRevealTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // QuestionLogic wiring 
-
-    /** Referensi ke QuestionLogic aktif selama sesi. Null di luar sesi. */
+    // Logic wiring
     private _logic: QuestionLogic | null = null;
+    private _onQuestionEvent: ((e: QuestionEvent) => void) | null = null;
 
-    /**
-     * Referensi handler yang di-bind per sesi.
-     * Disimpan supaya bisa di-off() dengan referensi yang sama saat sesi berakhir.
-     * Tanpa ini, setiap sesi akan menambah listener baru tanpa pernah membersihkan yang lama.
-     */
-    private _onQuestionEvent: ((event: QuestionEvent) => void) | null = null;
-
-    // Bound DOM handlers 
+    // Bound handlers
     private readonly _handleHint: () => void;
     private readonly _handleSubmit: () => void;
     private readonly _handleKeyDown: (e: KeyboardEvent) => void;
@@ -59,186 +51,187 @@ export class QuestionUI {
     // =========================================================================
 
     constructor() {
-
-        // CSS injection 
         const style = document.createElement('style');
         style.textContent = /* css */`
-
             #question-backdrop {
                 display: none;
-                position: fixed;
-                inset: 0;
-                z-index: 1010;
-                align-items: center;
-                justify-content: center;
-                padding: 16px;
-                box-sizing: border-box;
-                background: rgba(0, 0, 0, 0.6);
+                position: fixed; inset: 0; z-index: 1010;
+                align-items: center; justify-content: center;
+                padding: 16px; box-sizing: border-box;
+                background: rgba(0,0,0,0.6);
                 opacity: 0;
                 transition: opacity ${ANIM_DURATION_MS}ms ease;
             }
-            #question-backdrop.question-visible {
-                display: flex;
-                opacity: 1;
-            }
+            #question-backdrop.question-visible { display: flex; opacity: 1; }
 
             #question-panel {
                 position: relative;
-                width: 100%;
-                max-width: 460px;
-                max-height: 92vh;
+                width: 100%; max-width: 460px; max-height: 92vh;
                 overflow-y: auto;
                 background: #fffdf5;
                 border-radius: 20px;
-                box-shadow: 0 10px 48px rgba(0, 0, 0, 0.28);
-                padding: 22px 22px 26px;
-                box-sizing: border-box;
+                box-shadow: 0 10px 48px rgba(0,0,0,0.28);
+                padding: 22px 22px 26px; box-sizing: border-box;
                 transform: scale(0.9) translateY(24px);
-                transition:
-                    transform ${ANIM_DURATION_MS}ms cubic-bezier(0.34, 1.56, 0.64, 1),
-                    opacity   ${ANIM_DURATION_MS}ms ease;
+                transition: transform ${ANIM_DURATION_MS}ms cubic-bezier(0.34,1.56,0.64,1),
+                            opacity   ${ANIM_DURATION_MS}ms ease;
             }
             #question-backdrop.question-visible #question-panel {
                 transform: scale(1) translateY(0);
             }
 
             @keyframes q-shake {
-                0%, 100% { transform: translateX(0) scale(1); }
-                15%       { transform: translateX(-9px) scale(1.01); }
-                30%       { transform: translateX( 9px) scale(1.01); }
-                45%       { transform: translateX(-6px); }
-                60%       { transform: translateX( 6px); }
-                75%       { transform: translateX(-3px); }
-                90%       { transform: translateX( 3px); }
+                0%,100%{ transform:translateX(0) scale(1); }
+                15%    { transform:translateX(-9px) scale(1.01); }
+                30%    { transform:translateX(9px) scale(1.01); }
+                45%    { transform:translateX(-6px); }
+                60%    { transform:translateX(6px); }
+                75%    { transform:translateX(-3px); }
+                90%    { transform:translateX(3px); }
             }
-            #question-panel.q-shake {
-                animation: q-shake 0.46s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-            }
-
-            @keyframes q-wiggle {
-                0%, 100% { transform: translateX(0); }
-                25%       { transform: translateX(-5px); }
-                75%       { transform: translateX( 5px); }
-            }
-            .q-polya-input.q-wiggle {
-                animation: q-wiggle 0.28s ease both;
-            }
+            #question-panel.q-shake { animation: q-shake 0.46s cubic-bezier(0.36,0.07,0.19,0.97) both; }
 
             @keyframes q-card-enter {
-                from { opacity: 0.4; transform: translateX(18px); }
-                to   { opacity: 1;   transform: translateX(0); }
+                from { opacity:0.4; transform:translateX(18px); }
+                to   { opacity:1;   transform:translateX(0); }
             }
-            .q-polya-card.q-card-enter {
-                animation: q-card-enter 0.22s ease-out both;
-            }
+            .q-polya-card.q-card-enter { animation: q-card-enter 0.22s ease-out both; }
 
-            .q-header {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin-bottom: 16px;
+            /* Guiding view */
+            .q-guiding-view { display:none; }
+            .q-guiding-view.active { display:block; }
+            .q-guiding-title { font-size:14px; font-weight:700; color:#2d4a31; margin:0 0 12px; }
+            .q-guiding-list { list-style:none; padding:0; margin:0 0 18px; }
+            .q-guiding-list li {
+                font-size:14px; color:#333;
+                padding:7px 10px; margin-bottom:6px;
+                background:#f0f7f1; border-left:3px solid #2d7a3a;
+                border-radius:6px; line-height:1.4;
             }
-            .q-step-dots { display: flex; gap: 6px; }
+            .q-guiding-list li::before { content:'🤔  '; }
+            .q-btn-ready {
+                width:100%; padding:11px;
+                background:#2d7a3a; color:#fff;
+                border:none; border-radius:10px;
+                font-size:15px; font-weight:700;
+                cursor:pointer; transition:opacity 150ms ease;
+            }
+            .q-btn-ready:active { opacity:0.85; }
+
+            /* Question view */
+            .q-question-view { display:none; }
+            .q-question-view.active { display:block; }
+
+            /* Step dots — 4 phase indicators */
+            .q-header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+            .q-step-dots { display:flex; gap:6px; }
             .q-dot {
-                width: 10px; height: 10px;
-                border-radius: 50%;
-                background: #ddd;
+                width:10px; height:10px; border-radius:50%; background:#ddd;
                 transition: background 200ms ease, transform 200ms ease;
             }
-            .q-dot.q-dot-done   { background: #2d7a3a; }
-            .q-dot.q-dot-active {
-                background: #2d7a3a;
-                transform: scale(1.35);
-                box-shadow: 0 0 0 3px rgba(45, 122, 58, 0.2);
+            .q-dot.done   { background:#2d7a3a; }
+            .q-dot.active {
+                background:#2d7a3a; transform:scale(1.35);
+                box-shadow:0 0 0 3px rgba(45,122,58,0.2);
             }
-            .q-step-label { font-size: 12px; color: #888; margin-left: auto; }
+            .q-step-label { font-size:12px; color:#888; margin-left:auto; }
+
+            /* Sub-step counter — smaller, below header */
+            .q-substep-counter {
+                font-size:11px; color:#aaa;
+                margin-bottom:12px; display:block;
+            }
 
             .q-soal-text {
-                font-size: 15px;
-                line-height: 1.55;
-                color: #222;
-                margin: 0 0 14px;
+                font-size:15px; line-height:1.55; color:#222; margin:0 0 14px;
             }
 
             .q-polya-card {
-                background: #f0f7f1;
-                border-left: 4px solid #2d7a3a;
-                border-radius: 10px;
-                padding: 12px 14px;
-                margin-bottom: 12px;
+                background:#f0f7f1; border-left:4px solid #2d7a3a;
+                border-radius:10px; padding:12px 14px; margin-bottom:12px;
             }
-            .q-polya-prompt {
-                font-size: 14px;
-                color: #2d4a31;
-                margin: 0 0 10px;
-                font-style: italic;
-            }
+            .q-polya-card.soft-error { border-left-color:#e67e22; background:#fff8f0; }
+            .q-polya-card.soft-revealed { border-left-color:#e74c3c; background:#fff0ef; }
+
+            .q-polya-prompt { font-size:14px; color:#2d4a31; margin:0 0 10px; font-style:italic; }
+
             .q-polya-input {
-                width: 100%;
-                padding: 9px 12px;
-                font-size: 15px;
-                border: 2px solid #b5d4b9;
-                border-radius: 8px;
-                box-sizing: border-box;
-                outline: none;
-                transition: border-color 150ms ease;
+                width:100%; padding:9px 12px; font-size:15px;
+                border:2px solid #b5d4b9; border-radius:8px;
+                box-sizing:border-box; outline:none;
+                transition:border-color 150ms ease;
             }
-            .q-polya-input:focus        { border-color: #2d7a3a; }
-            .q-polya-input.q-input-correct { border-color: #2d7a3a; background: #e8f5ea; }
-            .q-polya-input.q-input-error   { border-color: #c0392b; background: #fdf0ef; }
+            .q-polya-input:focus         { border-color:#2d7a3a; }
+            .q-polya-input.correct        { border-color:#2d7a3a; background:#e8f5ea; }
+            .q-polya-input.error          { border-color:#c0392b; background:#fdf0ef; }
+            .q-polya-input.soft-error     { border-color:#e67e22; background:#fff8f0; }
 
-            .q-feedback { font-size: 13px; min-height: 20px; margin-bottom: 10px; color: #555; }
-            .q-feedback-correct { color: #2d7a3a; font-weight: 600; }
-            .q-feedback-error   { color: #c0392b; }
-            .q-feedback-hint    { color: #555; }
+            @keyframes q-wiggle {
+                0%,100%{ transform:translateX(0); }
+                25%    { transform:translateX(-5px); }
+                75%    { transform:translateX(5px); }
+            }
+            .q-polya-input.wiggle { animation: q-wiggle 0.28s ease both; }
+
+            /* Choice buttons */
+            .q-choices { display:flex; flex-direction:column; gap:8px; }
+            .q-choice-btn {
+                padding:9px 14px; background:#fff;
+                border:2px solid #b5d4b9; border-radius:8px;
+                font-size:14px; color:#2d4a31;
+                cursor:pointer; text-align:left;
+                transition: border-color 150ms ease, background 150ms ease;
+            }
+            .q-choice-btn:hover   { border-color:#2d7a3a; background:#f0f7f1; }
+            .q-choice-btn.selected { border-color:#2d7a3a; background:#e8f5ea; font-weight:600; }
+            .q-choice-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+            /* Soft-reveal answer badge */
+            .q-soft-reveal-badge {
+                display:inline-block; margin-top:8px;
+                background:#fdf3e3; color:#c0392b;
+                border:1px solid #f5c6a0; border-radius:6px;
+                padding:4px 10px; font-size:13px; font-weight:600;
+            }
+
+            .q-feedback { font-size:13px; min-height:20px; margin-bottom:10px; color:#555; }
+            .q-feedback.correct { color:#2d7a3a; font-weight:600; }
+            .q-feedback.error   { color:#c0392b; }
+            .q-feedback.hint    { color:#555; }
             .q-error-badge {
-                display: inline-block;
-                background: #fdf0ef;
-                color: #c0392b;
-                border: 1px solid #f5c6c2;
-                border-radius: 6px;
-                padding: 2px 8px;
-                font-size: 12px;
-                margin-bottom: 6px;
+                display:inline-block; background:#fdf0ef; color:#c0392b;
+                border:1px solid #f5c6c2; border-radius:6px;
+                padding:2px 8px; font-size:12px; margin-bottom:6px;
             }
-            .q-feedback-hint-with-error { display: flex; flex-direction: column; gap: 4px; }
+            .q-feedback.hint-with-error { display:flex; flex-direction:column; gap:4px; }
 
-            .q-actions { display: flex; gap: 10px; justify-content: flex-end; }
+            .q-actions { display:flex; gap:10px; justify-content:flex-end; }
             .q-btn {
-                padding: 9px 20px;
-                border-radius: 10px;
-                border: none;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 600;
+                padding:9px 20px; border-radius:10px; border:none;
+                cursor:pointer; font-size:14px; font-weight:600;
                 transition: opacity 150ms ease, transform 100ms ease;
             }
-            .q-btn:active    { transform: scale(0.96); }
-            .q-btn:disabled  { opacity: 0.45; cursor: not-allowed; }
-            .q-btn-hint   { background: #f0f0f0; color: #555; }
-            .q-btn-submit { background: #2d7a3a; color: #fff; }
+            .q-btn:active   { transform:scale(0.96); }
+            .q-btn:disabled { opacity:0.45; cursor:not-allowed; }
+            .q-btn-hint   { background:#f0f0f0; color:#555; }
+            .q-btn-submit { background:#2d7a3a; color:#fff; }
 
             .q-stars-layer {
-                position: absolute;
-                inset: 0;
-                pointer-events: none;
-                overflow: hidden;
-                border-radius: 20px;
+                position:absolute; inset:0;
+                pointer-events:none; overflow:hidden; border-radius:20px;
             }
             @keyframes q-star-fly {
-                0%   { transform: translateY(0)   scale(0.5); opacity: 1; }
-                100% { transform: translateY(-90px) scale(1.2); opacity: 0; }
+                0%   { transform:translateY(0) scale(0.5); opacity:1; }
+                100% { transform:translateY(-90px) scale(1.2); opacity:0; }
             }
             .q-star {
-                position: absolute;
-                bottom: 30%;
-                font-size: 24px;
+                position:absolute; bottom:30%; font-size:24px;
                 animation: q-star-fly var(--dur) var(--delay) ease-out both;
             }
         `;
         document.head.appendChild(style);
 
-        // DOM construction 
+        // ── DOM construction ──────────────────────────────────────────────────
 
         this.backdrop = document.createElement('div');
         this.backdrop.id = 'question-backdrop';
@@ -246,24 +239,36 @@ export class QuestionUI {
         this.panel = document.createElement('div');
         this.panel.id = 'question-panel';
 
-        // Header: step dots + label
+        // Guiding view
+        this.guidingView = document.createElement('div');
+        this.guidingView.className = 'q-guiding-view';
+
+        // Question view
+        this.questionView = document.createElement('div');
+        this.questionView.className = 'q-question-view';
+
+        // Header: 4 phase dots + phase label
         const header = document.createElement('div');
         header.className = 'q-header';
 
-        this.stepDots = document.createElement('div');
-        this.stepDots.className = 'q-step-dots';
+        this.stepDotsRow = document.createElement('div');
+        this.stepDotsRow.className = 'q-step-dots';
 
         this.stepLabel = document.createElement('span');
         this.stepLabel.className = 'q-step-label';
 
-        header.appendChild(this.stepDots);
+        header.appendChild(this.stepDotsRow);
         header.appendChild(this.stepLabel);
+
+        // Sub-step counter (smaller, below header)
+        this.subStepCounter = document.createElement('span');
+        this.subStepCounter.className = 'q-substep-counter';
 
         // Soal text
         this.soalText = document.createElement('p');
         this.soalText.className = 'q-soal-text';
 
-        // Polya card: prompt + input
+        // Polya card
         this.polyaCard = document.createElement('div');
         this.polyaCard.className = 'q-polya-card';
 
@@ -273,17 +278,17 @@ export class QuestionUI {
         this.polyaInput = document.createElement('input');
         this.polyaInput.className = 'q-polya-input';
         this.polyaInput.type = 'text';
-        this.polyaInput.inputMode = 'numeric';
-        this.polyaInput.placeholder = 'Ketik jawabanmu di sini...';
+
+        this.choicesContainer = document.createElement('div');
+        this.choicesContainer.className = 'q-choices';
 
         this.polyaCard.appendChild(this.polyaPrompt);
         this.polyaCard.appendChild(this.polyaInput);
+        this.polyaCard.appendChild(this.choicesContainer);
 
-        // Feedback area
         this.feedbackArea = document.createElement('div');
         this.feedbackArea.className = 'q-feedback';
 
-        // Actions
         const actions = document.createElement('div');
         actions.className = 'q-actions';
 
@@ -300,25 +305,32 @@ export class QuestionUI {
         actions.appendChild(this.btnHint);
         actions.appendChild(this.btnSubmit);
 
-        // Stars layer
+        this.questionView.appendChild(header);
+        this.questionView.appendChild(this.subStepCounter);
+        this.questionView.appendChild(this.soalText);
+        this.questionView.appendChild(this.polyaCard);
+        this.questionView.appendChild(this.feedbackArea);
+        this.questionView.appendChild(actions);
+
         this.starsLayer = document.createElement('div');
         this.starsLayer.className = 'q-stars-layer';
         this.starsLayer.setAttribute('aria-hidden', 'true');
 
-        // Assemble
-        this.panel.appendChild(header);
-        this.panel.appendChild(this.soalText);
-        this.panel.appendChild(this.polyaCard);
-        this.panel.appendChild(this.feedbackArea);
-        this.panel.appendChild(actions);
+        this.panel.appendChild(this.guidingView);
+        this.panel.appendChild(this.questionView);
         this.panel.appendChild(this.starsLayer);
         this.backdrop.appendChild(this.panel);
         document.body.appendChild(this.backdrop);
 
-        // ── Bound event handlers ──────────────────────────────────────────────
+        // 4 phase dots (static — selalu 4)
+        for (let i = 0; i < 4; i++) {
+            const dot = document.createElement('span');
+            dot.className = 'q-dot';
+            dot.dataset.index = String(i);
+            this.stepDotsRow.appendChild(dot);
+        }
 
-        // Disimpan sebagai property agar removeEventListener di destroy() bisa pakai
-        // referensi yang sama — anonymous function tidak bisa di-remove.
+        // Bound handlers
         this._handleHint = () => this._onHintClick();
         this._handleSubmit = () => this._onSubmitClick();
         this._handleKeyDown = (e: KeyboardEvent) => {
@@ -336,39 +348,35 @@ export class QuestionUI {
     // PUBLIC API
     // =========================================================================
 
-    /**
-     * Tampilkan panel soal dan mulai mendengarkan event dari QuestionLogic.
-     *
-     * Signature berubah dari show(question, onCorrect) menjadi show(question, logic).
-     * Tidak ada lagi callback — DialogManager bereaksi ke SESSION_COMPLETE dari QuestionLogic,
-     * bukan dari QuestionUI secara langsung.
-     */
     public show(question: Question, logic: QuestionLogic, onHidden?: () => void): void {
-        console.log('[QuestionUI.show] called | question:', question.id, '| still visible:', this._isVisible());
         if (this._isVisible()) this._clearState();
 
         this._question = question;
         this._logic = logic;
         this._hintVisible = false;
+        this._currentStep = 0;
+        this._currentSubStep = 0;
+        this._onHidden = onHidden ?? null;
 
-        // Subscribe ke event QuestionLogic untuk sesi ini.
-        // Handler baru dibuat per sesi agar bisa di-off() dengan tepat.
-        this._onQuestionEvent = (event) => this._handleQuestionEvent(event);
+        this._onQuestionEvent = (e) => this._handleQuestionEvent(e);
         this._logic.on(this._onQuestionEvent);
 
         this._resetDom();
-        this._buildStepDots(question.polya_steps.length);
-        this.soalText.textContent = question.teks_soal;
-        this._renderStep(0);
         this._setVisible(true);
 
-        requestAnimationFrame(() => this.polyaInput.focus());
-        this._onHidden = onHidden ?? null;
+        if (question.guiding_questions?.length) {
+            this._renderGuidingScreen(question.guiding_questions, () => this._renderQuestionScreen());
+        } else {
+            this._renderQuestionScreen();
+        }
     }
 
     public hide(): void {
+        if (this._softRevealTimer) {
+            clearTimeout(this._softRevealTimer);
+            this._softRevealTimer = null;
+        }
         this._setVisible(false);
-        // Delay clear agar transisi keluar selesai dulu sebelum DOM direset.
         setTimeout(() => this._clearState(), ANIM_DURATION_MS);
     }
 
@@ -381,10 +389,296 @@ export class QuestionUI {
     }
 
     // =========================================================================
+    // PRIVATE — Guiding screen
+    // =========================================================================
+
+    private _renderGuidingScreen(questions: string[], onReady: () => void): void {
+        this.guidingView.innerHTML = '';
+        this.guidingView.classList.add('active');
+        this.questionView.classList.remove('active');
+
+        const title = document.createElement('p');
+        title.className = 'q-guiding-title';
+        title.textContent = '🧠 Sebelum menjawab, pikirkan dulu...';
+
+        const list = document.createElement('ul');
+        list.className = 'q-guiding-list';
+        for (const q of questions) {
+            const li = document.createElement('li');
+            li.textContent = q;
+            list.appendChild(li);
+        }
+
+        const btnReady = document.createElement('button');
+        btnReady.className = 'q-btn-ready';
+        btnReady.textContent = 'Siap Menjawab →';
+        btnReady.addEventListener('click', () => {
+            this.guidingView.classList.remove('active');
+            onReady();
+        }, { once: true });
+
+        this.guidingView.appendChild(title);
+        this.guidingView.appendChild(list);
+        this.guidingView.appendChild(btnReady);
+    }
+
+    // =========================================================================
+    // PRIVATE — Question screen
+    // =========================================================================
+
+    private _renderQuestionScreen(): void {
+        this.guidingView.classList.remove('active');
+        this.questionView.classList.add('active');
+        this.soalText.textContent = this._question!.teks_soal;
+        this._renderSubStep(0, 0);
+        requestAnimationFrame(() => this.polyaInput.focus());
+    }
+
+    /**
+     * Render satu sub-step.
+     * step     = Polya phase (0–3)
+     * subStep  = index dalam sub_steps phase itu
+     */
+    private _renderSubStep(step: number, subStep: number): void {
+        const q = this._question!;
+        const phase = q.polya_steps[step];
+        const sub = phase.sub_steps[subStep];
+        const totalSubSteps = phase.sub_steps.length;
+        const isLastPhase = step === 3;
+        const isLastSubStep = subStep === totalSubSteps - 1;
+
+        this._currentStep = step;
+        this._currentSubStep = subStep;
+
+        // Reset input state
+        this.polyaInput.value = '';
+        this.polyaInput.classList.remove('error', 'soft-error', 'correct');
+        this.polyaCard.classList.remove('soft-error', 'soft-revealed');
+        this.feedbackArea.textContent = '';
+        this.feedbackArea.className = 'q-feedback';
+        this.btnSubmit.disabled = false;
+
+        // Phase dots — 4 dots, active = current step
+        this.stepDotsRow.querySelectorAll<HTMLSpanElement>('.q-dot').forEach((dot, i) => {
+            dot.classList.toggle('done', i < step);
+            dot.classList.toggle('active', i === step);
+        });
+
+        // Labels
+        this.stepLabel.textContent = phase.label;
+
+        // Sub-step counter — tampilkan hanya jika ada lebih dari 1 sub-step
+        if (totalSubSteps > 1) {
+            this.subStepCounter.textContent = `Pertanyaan ${subStep + 1} dari ${totalSubSteps}`;
+        } else {
+            this.subStepCounter.textContent = '';
+        }
+
+        // Prompt
+        this.polyaPrompt.textContent = sub.prompt;
+
+        // Submit button text
+        const isVeryLast = isLastPhase && isLastSubStep;
+        this.btnSubmit.textContent = isVeryLast ? 'Jawab ✓' : 'Lanjut ›';
+
+        // Hint — hanya tampilkan di phase terakhir (jawaban sesungguhnya)
+        this.btnHint.style.display = isLastPhase ? '' : 'none';
+
+        // Render input type
+        if (sub.input_type === 'choice') {
+            this._renderChoices(sub.choices ?? [], sub);
+        } else if (sub.input_type === 'none') {
+            this.polyaInput.style.display = 'none';
+            this.choicesContainer.style.display = 'none';
+        } else {
+            this.polyaInput.style.display = '';
+            this.polyaInput.inputMode = sub.input_type === 'number' ? 'numeric' : 'text';
+            this.polyaInput.placeholder = sub.input_type === 'number'
+                ? 'Tulis angka...'
+                : 'Tulis jawabanmu...';
+            this.choicesContainer.innerHTML = '';
+            this.choicesContainer.style.display = 'none';
+        }
+
+        // Slide-in animation
+        this.polyaCard.classList.remove('q-card-enter');
+        void this.polyaCard.offsetWidth;
+        this.polyaCard.classList.add('q-card-enter');
+    }
+
+    private _renderChoices(choices: string[], sub: PolyaSubStep): void {
+        this.polyaInput.style.display = 'none';
+        this.choicesContainer.innerHTML = '';
+        this.choicesContainer.style.display = 'flex';
+
+        for (const choice of choices) {
+            const btn = document.createElement('button');
+            btn.className = 'q-choice-btn';
+            btn.textContent = choice;
+            btn.type = 'button';
+            btn.addEventListener('click', () => {
+                // highlight
+                this.choicesContainer.querySelectorAll('.q-choice-btn').forEach(b =>
+                    b.classList.remove('selected')
+                );
+                btn.classList.add('selected');
+                this._logic?.submitStep(choice);
+            });
+            this.choicesContainer.appendChild(btn);
+        }
+    }
+
+    // =========================================================================
+    // PRIVATE — QuestionLogic event handler
+    // =========================================================================
+
+    private _handleQuestionEvent(event: QuestionEvent): void {
+        switch (event.type) {
+
+            case 'SUBSTEP_ADVANCED':
+                this._renderSubStep(event.session.currentStep, event.newSubStep);
+                break;
+
+            case 'STEP_ADVANCED':
+                this._hintVisible = false;
+                this._renderSubStep(event.newStep, 0);
+                break;
+
+            case 'SOFT_ERROR':
+                // Jawaban salah tapi masih ada kesempatan — highlight ringan
+                this.polyaInput.classList.add('soft-error');
+                this.polyaCard.classList.add('soft-error');
+                this._wiggleInput();
+                this._showFeedback('error', '🔍 Perhatikan soalnya lagi, coba sekali lagi!');
+                break;
+
+            case 'SOFT_REVEALED': {
+                // Kesempatan habis — tampilkan jawaban benar, lalu auto-advance
+                this.polyaCard.classList.add('soft-revealed');
+                this._disableAllInputs();
+
+                const badge = document.createElement('span');
+                badge.className = 'q-soft-reveal-badge';
+                badge.textContent = `Jawaban yang benar: ${event.correct}`;
+                this.feedbackArea.innerHTML = '';
+                this.feedbackArea.appendChild(badge);
+
+                this._softRevealTimer = setTimeout(() => {
+                    this._softRevealTimer = null;
+                    this._logic?.advanceSubStep();
+                }, SOFT_REVEAL_ADVANCE_MS);
+                break;
+            }
+
+            case 'INPUT_ERROR':
+                this._wiggleInput();
+                break;
+
+            case 'ANSWER_WRONG':
+                this.polyaInput.classList.add('error');
+                this._triggerShake();
+                if (!this._hintVisible) {
+                    this._hintVisible = true;
+                    this._showHint(this._question?.hint ?? '');
+                }
+                this._showFeedback('error', `Coba lagi! Sisa ${event.maxAttempts - event.attempts} kesempatan.`);
+                break;
+
+            case 'ANSWER_REVEALED':
+                this._disableAllInputs();
+                this._showFeedback('error', `❌ Jawaban yang benar adalah ${this._question!.jawaban}.`);
+                break;
+
+            case 'SESSION_COMPLETE':
+                if (event.score.stars > 0) {
+                    this._disableAllInputs();
+                    this.polyaInput.classList.add('correct');
+                    this._showFeedback('correct', '🎉 Benar! Kamu hebat!');
+                    this._triggerStarAnimation(event.score.stars);
+                }
+                setTimeout(() => this.hide(), POST_CORRECT_DELAY_MS);
+                break;
+        }
+    }
+
+    // =========================================================================
+    // PRIVATE — DOM handlers
+    // =========================================================================
+
+    private _onSubmitClick(): void {
+        const q = this._question;
+        if (!q) return;
+
+        const phase = q.polya_steps[this._currentStep];
+        const sub: PolyaSubStep | undefined = phase?.sub_steps[this._currentSubStep];
+
+        if (sub?.input_type === 'none') {
+            this._logic?.submitStep('');
+            return;
+        }
+
+        if (sub?.input_type === 'choice') {
+            // choice diklik via _renderChoices — Submit tidak aktif di sini
+            return;
+        }
+
+        const raw = this.polyaInput.value.trim();
+        if (!raw) { this._wiggleInput(); return; }
+        this._logic?.submitStep(raw);
+    }
+
+    private _onHintClick(): void {
+        if (!this._logic || this._hintVisible) return;
+        const hintText = this._logic.getHint();
+        this._hintVisible = true;
+        this._showHint(hintText);
+    }
+
+    // =========================================================================
+    // PRIVATE — Feedback helpers
+    // =========================================================================
+
+    private _showHint(hintText: string): void {
+        this.feedbackArea.innerHTML = '';
+        const el = document.createElement('div');
+        el.className = 'q-feedback hint';
+        el.textContent = `💡 ${hintText}`;
+        this.feedbackArea.appendChild(el);
+        this.feedbackArea.className = 'q-feedback';
+    }
+
+    private _showFeedback(type: 'correct' | 'error', text: string): void {
+        if (type === 'error' && this._hintVisible) {
+            const badge = document.createElement('span');
+            badge.className = 'q-error-badge';
+            badge.textContent = text;
+            this.feedbackArea.querySelector('.q-error-badge')?.remove();
+            this.feedbackArea.prepend(badge);
+            this.feedbackArea.classList.add('hint-with-error');
+        } else {
+            this.feedbackArea.textContent = text;
+            this.feedbackArea.className = `q-feedback ${type}`;
+        }
+    }
+
+    private _disableAllInputs(): void {
+        this.polyaInput.disabled = true;
+        this.btnSubmit.disabled = true;
+        this.btnHint.disabled = true;
+        this.choicesContainer.querySelectorAll<HTMLButtonElement>('.q-choice-btn').forEach(b => {
+            b.disabled = true;
+        });
+    }
+
+    // =========================================================================
     // PRIVATE — State management
     // =========================================================================
 
     private _clearState(): void {
+        if (this._softRevealTimer) {
+            clearTimeout(this._softRevealTimer);
+            this._softRevealTimer = null;
+        }
         if (this._logic && this._onQuestionEvent) {
             this._logic.off(this._onQuestionEvent);
         }
@@ -392,9 +686,10 @@ export class QuestionUI {
         this._onQuestionEvent = null;
         this._question = null;
         this._hintVisible = false;
+        this._currentStep = 0;
+        this._currentSubStep = 0;
         this._resetDom();
 
-        // Panggil SETELAH clear agar callback tidak melihat state lama
         const cb = this._onHidden;
         this._onHidden = null;
         cb?.();
@@ -403,242 +698,65 @@ export class QuestionUI {
     private _resetDom(): void {
         this.polyaInput.value = '';
         this.polyaInput.disabled = false;
-        this.polyaInput.classList.remove('q-input-correct', 'q-input-error');
-
+        this.polyaInput.classList.remove('correct', 'error', 'soft-error', 'wiggle');
+        this.polyaInput.style.display = '';
+        this.choicesContainer.innerHTML = '';
+        this.choicesContainer.style.display = 'none';
         this.btnSubmit.disabled = false;
         this.btnHint.disabled = false;
+        this.btnHint.style.display = '';
         this.btnSubmit.textContent = 'Lanjut ›';
-
         this.feedbackArea.textContent = '';
         this.feedbackArea.className = 'q-feedback';
-
+        this.polyaCard.classList.remove('soft-error', 'soft-revealed', 'q-card-enter');
         this.panel.classList.remove('q-shake');
         this.starsLayer.innerHTML = '';
-        this.starsLayer.classList.remove('q-stars-active');
+        this.guidingView.classList.remove('active');
+        this.questionView.classList.remove('active');
     }
 
     // =========================================================================
-    // PRIVATE — QuestionLogic event handler
-    //
-    // Inilah "jantung" baru QuestionUI setelah refactor.
-    // Semua perubahan state yang sebelumnya tersebar di _handleCorrect()
-    // dan _handleWrong() sekarang terpusat di sini, dikontrol oleh QuestionLogic.
+    // PRIVATE — Animations
     // =========================================================================
-
-    private _handleQuestionEvent(event: QuestionEvent): void {
-        switch (event.type) {
-
-            case 'STEP_ADVANCED':
-                // QuestionLogic sudah validasi input step sebelumnya — lanjut render.
-                this._renderStep(event.newStep);
-                break;
-
-            case 'ANSWER_WRONG':
-                this.polyaInput.classList.add('q-input-error');
-                this._triggerShake();
-
-                // Hint otomatis muncul setelah jawaban pertama kali salah.
-                // Tidak perlu panggil logic.getHint() karena ini auto-show,
-                // bukan user request — hintUsed tracking tetap akurat di QuestionLogic.
-                if (!this._hintVisible) {
-                    this._hintVisible = true;
-                    this._showHint(this._question?.hint ?? '');
-                }
-
-                this._showFeedback(
-                    'error',
-                    `Coba lagi! Sisa ${event.maxAttempts - event.attempts} kesempatan.`,
-                );
-                break;
-
-            case 'ANSWER_REVEALED':
-                // Attempts habis — tampilkan jawaban benar, kunci UI.
-                // JANGAN panggil hide() di sini: SESSION_COMPLETE akan menyusul
-                // langsung setelah ini (synchronous di QuestionLogic) dan
-                // SESSION_COMPLETE yang bertanggung jawab menutup panel.
-                this.polyaInput.disabled = true;
-                this.btnSubmit.disabled = true;
-                this.btnHint.disabled = true;
-                this._showFeedback(
-                    'error',
-                    `❌ Jawaban yang benar adalah ${this._question!.jawaban}.`,
-                );
-                break;
-
-            case 'SESSION_COMPLETE':
-                if (event.score.stars > 0) {
-                    // Jawaban benar — tampilkan selebrasi.
-                    this.polyaInput.disabled = true;
-                    this.btnSubmit.disabled = true;
-                    this.btnHint.disabled = true;
-                    this.polyaInput.classList.add('q-input-correct');
-                    this._showFeedback('correct', '🎉 Benar! Kamu hebat!');
-                    this._triggerStarAnimation(event.score.stars);
-                }
-                // Baik benar (stars > 0) maupun attempts habis (stars = 0):
-                // tutup panel setelah delay agar player sempat melihat feedback.
-                setTimeout(() => this.hide(), POST_CORRECT_DELAY_MS);
-                break;
-        }
-    }
-
-    // =========================================================================
-    // PRIVATE — DOM event handlers (delegate ke QuestionLogic)
-    // =========================================================================
-
-    private _onSubmitClick(): void {
-        const raw = this.polyaInput.value.trim();
-        if (!raw) {
-            // Input kosong — wiggle saja, jangan submit ke logic.
-            this._wiggleInput();
-            return;
-        }
-        // Delegasi penuh ke QuestionLogic.
-        // QuestionUI tidak tahu apakah ini step terakhir atau bukan —
-        // itu adalah domain logic, bukan domain presentasi.
-        this._logic?.submitStep(raw);
-    }
-
-    private _onHintClick(): void {
-        // Guard: jika hint sudah tampil atau tidak ada sesi aktif, abaikan.
-        if (!this._logic || this._hintVisible) return;
-
-        // getHint() sekaligus mencatat hintUsed = true di QuestionLogic.
-        const hintText = this._logic.getHint();
-        this._hintVisible = true;
-        this._showHint(hintText);
-    }
-
-    // =========================================================================
-    // PRIVATE — Rendering
-    // =========================================================================
-
-    private _buildStepDots(total: number): void {
-        this.stepDots.innerHTML = '';
-        for (let i = 0; i < total; i++) {
-            const dot = document.createElement('span');
-            dot.className = 'q-dot';
-            dot.dataset.index = String(i);
-            this.stepDots.appendChild(dot);
-        }
-    }
-
-    private _updateStepDots(activeStep: number): void {
-        this.stepDots.querySelectorAll<HTMLSpanElement>('.q-dot').forEach((dot, i) => {
-            dot.classList.toggle('q-dot-done', i < activeStep);
-            dot.classList.toggle('q-dot-active', i === activeStep);
-        });
-    }
-
-    private _renderStep(step: number): void {
-        const q = this._question!;
-        const totalSteps = q.polya_steps.length;
-        const isLast = step === totalSteps - 1;
-
-        // Reset input untuk step baru.
-        // stepInputs kini ada di SessionState (QuestionLogic) — QuestionUI
-        // tidak perlu menyimpan ini lagi. Tidak ada restore, cukup clear.
-        this.polyaInput.value = '';
-        this.polyaInput.classList.remove('q-input-error');
-
-        // Update prompt teks Polya
-        this.polyaPrompt.textContent = q.polya_steps[step];
-
-        // Update label dan tombol
-        this.stepLabel.textContent = `Langkah ${step + 1} dari ${totalSteps}`;
-        this.btnSubmit.textContent = isLast ? 'Jawab ✓' : 'Lanjut ›';
-
-        this._updateStepDots(step);
-
-        // Slide-in animation
-        this.polyaCard.classList.remove('q-card-enter');
-        void this.polyaCard.offsetWidth; // force reflow agar animasi bisa re-trigger
-        this.polyaCard.classList.add('q-card-enter');
-
-        requestAnimationFrame(() => this.polyaInput.focus());
-    }
-
-    private _showHint(hintText: string): void {
-        const hintEl = document.createElement('div');
-        hintEl.className = 'q-feedback q-feedback-hint';
-        hintEl.textContent = `💡 ${hintText}`;
-
-        this.feedbackArea.innerHTML = '';
-        this.feedbackArea.appendChild(hintEl);
-        this.feedbackArea.className = 'q-feedback';
-    }
-
-    private _showFeedback(type: 'correct' | 'error', text: string): void {
-        if (type === 'error' && this._hintVisible) {
-            // Tampilkan error sebagai badge di atas hint yang sudah ada.
-            const errBadge = document.createElement('span');
-            errBadge.className = 'q-error-badge';
-            errBadge.textContent = text;
-
-            this.feedbackArea.querySelector('.q-error-badge')?.remove();
-            this.feedbackArea.prepend(errBadge);
-            this.feedbackArea.classList.add('q-feedback-hint-with-error');
-        } else {
-            this.feedbackArea.textContent = text;
-            this.feedbackArea.className = `q-feedback q-feedback-${type}`;
-        }
-    }
 
     private _triggerShake(): void {
         this.panel.classList.remove('q-shake');
-        void this.panel.offsetWidth; // force reflow
+        void this.panel.offsetWidth;
         this.panel.classList.add('q-shake');
     }
 
     private _wiggleInput(): void {
-        this.polyaInput.classList.remove('q-wiggle');
+        this.polyaInput.classList.remove('wiggle');
         void this.polyaInput.offsetWidth;
-        this.polyaInput.classList.add('q-wiggle');
+        this.polyaInput.classList.add('wiggle');
     }
 
     private _triggerStarAnimation(starCount: number): void {
         this.starsLayer.innerHTML = '';
-        this.starsLayer.classList.add('q-stars-active');
-
-        const particleCount = starCount * 5;
-
-        for (let i = 0; i < particleCount; i++) {
+        const count = starCount * 5;
+        for (let i = 0; i < count; i++) {
             const el = document.createElement('span');
             el.className = 'q-star';
             el.textContent = STAR_CHARS[i % STAR_CHARS.length];
-
-            const leftPct = 5 + Math.random() * 90;
-            const delayS = Math.random() * 0.5;
-            const durationS = 0.8 + Math.random() * 0.7;
-
-            el.style.cssText =
-                `left: ${leftPct}%;` +
-                `--delay: ${delayS}s;` +
-                `--dur: ${durationS}s;` +
-                `font-size: ${22 + Math.random() * 16}px;`;
-
+            const left = 5 + Math.random() * 90;
+            const delay = Math.random() * 0.5;
+            const dur = 0.8 + Math.random() * 0.7;
+            el.style.cssText = `left:${left}%;--delay:${delay}s;--dur:${dur}s;font-size:${22 + Math.random() * 16}px;`;
             this.starsLayer.appendChild(el);
         }
     }
 
     // =========================================================================
-    // PRIVATE — Visibility helpers
+    // PRIVATE — Visibility
     // =========================================================================
 
     private _setVisible(visible: boolean): void {
         if (visible) {
             this.backdrop.style.display = 'flex';
-            // rAF untuk memastikan display:flex sudah aktif sebelum class ditambah
-            // — ini yang memungkinkan CSS transition berjalan.
-            requestAnimationFrame(() => {
-                this.backdrop.classList.add('question-visible');
-            });
+            requestAnimationFrame(() => this.backdrop.classList.add('question-visible'));
         } else {
             this.backdrop.classList.remove('question-visible');
-            // Sembunyikan sepenuhnya setelah transisi selesai.
-            setTimeout(() => {
-                this.backdrop.style.display = 'none';
-            }, ANIM_DURATION_MS);
+            setTimeout(() => { this.backdrop.style.display = 'none'; }, ANIM_DURATION_MS);
         }
     }
 

@@ -5,17 +5,25 @@ import { TileTriggerSystem, type TileTriggerRegistry } from '../core/TileTrigger
 import { EventBus, GameEvent } from '../core/EventBus';
 import { DialogUI } from '../ui/DialogUI';
 import { QuestionUI } from '../ui/QuestionUI';
+import { ExplorationUI } from '../ui/ExplorationUI';
 import { TutorialUI } from '../ui/TutorialUI';
 import { DialogManager } from '../core/DialogManager';
+import { ExplorationManager } from '../core/ExplorationManager';
 import { HudUI } from '../ui/HudUI';
 import { WorldCompleteUI } from '../ui/WorldCompleteUI';
 import type { TileNode, DecorConfig } from './WorldTypes';
+
+// =============================================================================
+// TILE MAP — 6×6
+// E = exploration trigger (walkable, one-time)
+// Q = question trigger (walkable)
+// =============================================================================
 
 const BEDROOM_MAP: string[][] = [
     // tx:  0    1    2    3    4    5
     /* ty 0 */['W', 'W', 'W', 'W', 'W', 'W'],
     /* ty 1 */['W', 'F', 'F', 'Q', 'F', 'W'],
-    /* ty 2 */['W', 'F', 'F', 'F', 'F', 'W'],
+    /* ty 2 */['W', 'F', 'E', 'F', 'F', 'W'],  // E di (2,2)
     /* ty 3 */['W', 'F', 'F', 'F', 'F', 'W'],
     /* ty 4 */['W', 'F', 'F', 'F', 'F', 'W'],
     /* ty 5 */['W', 'W', '>', '>', 'W', 'W'],
@@ -34,17 +42,28 @@ const TILE_DEFS: Record<string, TileDef> = {
     W: { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: false },
     '>': { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: true },
     Q: { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: true },
+    E: { texture: 'floor', assetPath: 'assets/floor_tile.png', walkable: true },
 };
 
 const BEDROOM_TRIGGERS: TileTriggerRegistry = {
     '>': 'portal_to_home',
     'Q': 'bedroom_q',
+    'E': 'explore_luas',
 };
 
-// Mapping tile char → triggerId untuk indicator
 const TILE_TRIGGER_MAP: Record<string, string> = {
     'Q': 'bedroom_q',
+    'E': 'explore_luas',
 };
+
+const TOPIC_INDICATOR_COLOR: Record<'keliling' | 'luas', string> = {
+    keliling: '#f5a623',
+    luas: '#4a90e2',
+};
+const DEFAULT_INDICATOR_COLOR = '#9bd009';
+
+// Exploration tile pakai warna berbeda dari question — ungu
+const EXPLORE_INDICATOR_COLOR = '#9b59b6';
 
 const cellAt = (tx: number, ty: number): string =>
     BEDROOM_MAP[ty]?.[tx] ?? DEFAULT_CELL;
@@ -52,10 +71,10 @@ const cellAt = (tx: number, ty: number): string =>
 const defOf = (cell: string): TileDef =>
     TILE_DEFS[cell] ?? TILE_DEFS[DEFAULT_CELL]!;
 
-// Indicator entry — simpan indicator + triggerId-nya
 interface IndicatorEntry {
     indicator: Phaser.GameObjects.Text;
     triggerId: string;
+    tileType: 'Q' | 'E';
 }
 
 export default class BedroomWorld extends BaseWorld {
@@ -63,14 +82,17 @@ export default class BedroomWorld extends BaseWorld {
     private player!: Player;
     private analogStick!: VirtualAnalog;
     private triggerSystem: TileTriggerSystem | null = null;
+
     private dialogUI!: DialogUI;
     private questionUI!: QuestionUI;
     private dialogManager!: DialogManager;
+
+    private explorationUI!: ExplorationUI;
+    private explorationManager!: ExplorationManager;
+
     private hud!: HudUI;
     private _onWorldComplete!: (p: { worldKey: string }) => void;
 
-
-    // Indicator dengan info triggerId-nya
     private questionIndicators: IndicatorEntry[] = [];
 
     private _onTrigger!: (p: { triggerId: string; tx: number; ty: number; entityId: string }) => void;
@@ -101,18 +123,30 @@ export default class BedroomWorld extends BaseWorld {
         Player.preloadAssets(this);
     }
 
-    override async create(): Promise<void> {
+    override create(): void {
         super.create();
 
         this.spawnPlayer();
         console.log('player spawn at:', this.player.tileX, this.player.tileY);
 
+        // ── Question system ───────────────────────────────────────────────────
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('BedroomWorld', ['bedroom_q']);
+        this.dialogManager.init('BedroomWorld', ['bedroom_q']).then(() => {
+            if (!this.scene.isActive('BedroomWorld')) return;  // ← guard
+            this.spawnQuestionIndicators();
+        });
 
-        this.spawnQuestionIndicators();
+        // ── Exploration system ────────────────────────────────────────────────
+        this.explorationUI = new ExplorationUI();
+        this.explorationManager = new ExplorationManager(this.explorationUI);
+        this.explorationManager.init(['explore_luas'], () => {
+            this.updateIndicators();
+        }).then(() => {
+            if (!this.scene.isActive('BedroomWorld')) return;  // ← guard
+            this.spawnExplorationIndicators();
+        });
 
         this.triggerSystem = new TileTriggerSystem(
             this.grid,
@@ -121,12 +155,7 @@ export default class BedroomWorld extends BaseWorld {
         );
 
         this._onTrigger = ({ triggerId }) => {
-            this._onTrigger = ({ triggerId }) => {
-                console.log('trigger fired:', triggerId); // ← tambah ini
-                if (triggerId === 'portal_to_home') {
-                    this.scene.start('HomeWorld');
-                }
-            };
+            console.log('trigger fired:', triggerId);
             if (triggerId === 'portal_to_home') {
                 this.scene.start('HomeWorld');
             }
@@ -136,8 +165,7 @@ export default class BedroomWorld extends BaseWorld {
         EventBus.on(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
 
         this.game.canvas.focus();
-
-        TutorialUI.showOnce(() => { this.game.canvas.focus(); })
+        TutorialUI.showOnce(() => { this.game.canvas.focus(); });
 
         this.hud = new HudUI();
         this.hud.show();
@@ -151,7 +179,6 @@ export default class BedroomWorld extends BaseWorld {
             });
         };
         EventBus.on(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
-
     }
 
     private readonly _onQuestionAnswered = ({ correct }: { questionId: string; correct: boolean; attempts: number; stars: number }) => {
@@ -176,20 +203,26 @@ export default class BedroomWorld extends BaseWorld {
     }
 
     override shutdown(): void {
-
         console.log('[BW.shutdown] before off | count:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
         EventBus.off(GameEvent.TILE_TRIGGER_ENTERED, this._onTrigger);
         console.log('[BW.shutdown] after off  | count:', EventBus.listenerCount(GameEvent.TILE_TRIGGER_ENTERED));
 
         EventBus.off(GameEvent.QUESTION_ANSWERED, this._onQuestionAnswered);
+
         this.dialogManager?.destroy();
         this.dialogUI?.destroy();
         this.questionUI?.destroy();
+
+        this.explorationManager?.destroy();
+        this.explorationUI?.destroy();
+
         this.triggerSystem?.destroy();
         this.triggerSystem = null;
+
         this.analogStick?.destroy();
         this.questionIndicators.forEach(e => e.indicator.destroy());
         this.questionIndicators = [];
+
         EventBus.off(GameEvent.WORLD_COMPLETE, this._onWorldComplete);
         this.hud.destroy();
         super.shutdown();
@@ -217,48 +250,79 @@ export default class BedroomWorld extends BaseWorld {
         this.placeDecorations();
     }
 
-    // =========================================================================
-    // QUESTION INDICATORS
-    // =========================================================================
-
+    // INDICATORS
     private spawnQuestionIndicators(): void {
         for (let ty = 0; ty < this.worldSize; ty++) {
             for (let tx = 0; tx < this.worldSize; tx++) {
                 const cell = cellAt(tx, ty);
+                if (cell !== 'Q') continue;
+
                 const triggerId = TILE_TRIGGER_MAP[cell];
-                if (!triggerId) continue;
-
                 const tile = this.getTileNode(tx, ty);
-                if (!tile) continue;
+                if (!tile || !triggerId) continue;
 
-                const indicator = this.add.text(
-                    tile.worldX,
-                    tile.worldY + 12,
-                    '!',
-                    {
-                        fontSize: '14px',
-                        fontFamily: 'monospace',
-                        color: '#ffffff',
-                        backgroundColor: '#9bd009',
-                        padding: { x: 5, y: 2 },
-                        resolution: 2,
-                    }
-                )
-                    .setOrigin(0.5, 1)
-                    .setDepth(10_000);
+                const topic = this.dialogManager.getTopicForTrigger(triggerId);
+                const color = topic ? TOPIC_INDICATOR_COLOR[topic] : DEFAULT_INDICATOR_COLOR;
 
-                this.entityLayer.add(indicator);
-                this.questionIndicators.push({ indicator, triggerId });
+                const indicator = this._makeIndicator(tile, '!', color);
+                this.questionIndicators.push({ indicator, triggerId, tileType: 'Q' });
             }
         }
     }
 
-    // Sembunyikan indikator hanya kalau semua soal untuk triggerId itu sudah selesai
-    private updateIndicators(): void {
-        for (const entry of this.questionIndicators) {
-            if (this.dialogManager.isTileComplete(entry.triggerId)) {
-                entry.indicator.setVisible(false);
+    /**
+     * Exploration indicators — ungu, pakai '?' sebagai tanda eksplorasi.
+     * Muncul setelah explorationManager.init() selesai.
+     */
+    private spawnExplorationIndicators(): void {
+        for (let ty = 0; ty < this.worldSize; ty++) {
+            for (let tx = 0; tx < this.worldSize; tx++) {
+                const cell = cellAt(tx, ty);
+                if (cell !== 'E') continue;
+
+                const triggerId = TILE_TRIGGER_MAP[cell];
+                const tile = this.getTileNode(tx, ty);
+                if (!tile || !triggerId) continue;
+
+                const indicator = this._makeIndicator(tile, '?', EXPLORE_INDICATOR_COLOR);
+                this.questionIndicators.push({ indicator, triggerId, tileType: 'E' });
             }
+        }
+    }
+
+    private _makeIndicator(
+        tile: TileNode,
+        char: string,
+        color: string,
+    ): Phaser.GameObjects.Text {
+        const indicator = this.add.text(
+            tile.worldX,
+            tile.worldY + 12,
+            char,
+            {
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                color: '#ffffff',
+                backgroundColor: color,
+                padding: { x: 5, y: 2 },
+                resolution: 2,
+            }
+        )
+            .setOrigin(0.5, 1)
+            .setDepth(10_000);
+
+        this.entityLayer.add(indicator);
+        return indicator;
+    }
+
+    private updateIndicators(): void {
+        console.log('[updateIndicators] total entries:', this.questionIndicators.length);
+        for (const entry of this.questionIndicators) {
+            const done = entry.tileType === 'Q'
+                ? this.dialogManager.isTileComplete(entry.triggerId)
+                : this.explorationManager.isComplete(entry.triggerId);
+            console.log(' entry:', entry.triggerId, '| tileType:', entry.tileType, '| done:', done);
+            if (done) entry.indicator.setVisible(false);
         }
     }
 
@@ -286,10 +350,8 @@ export default class BedroomWorld extends BaseWorld {
     private placeWalls(): void {
         const WALL_HEIGHT = 16;
         const LEVELS = 3;
-        const NE_OFFSET_X = 8;
-        const NE_OFFSET_Y = 13;
-        const NW_OFFSET_X = -8;
-        const NW_OFFSET_Y = 16;
+        const NE_OFFSET_X = 8, NE_OFFSET_Y = 13;
+        const NW_OFFSET_X = -8, NW_OFFSET_Y = 16;
 
         const getIsoDepth = (tx: number, ty: number, level: number) =>
             (tx + ty) * 10 + level;
@@ -298,12 +360,9 @@ export default class BedroomWorld extends BaseWorld {
             for (let level = 0; level < LEVELS; level++) {
                 const depth = getIsoDepth(tx, 0, level);
                 const deco = this.placeWallDeco({
-                    tx, ty: 0,
-                    texture: 'wall_ne',
-                    ox: 0.5, oy: 1,
-                    offsetX: NE_OFFSET_X,
-                    offsetY: -(level * WALL_HEIGHT) + NE_OFFSET_Y,
-                    scale: 1,
+                    tx, ty: 0, texture: 'wall_ne',
+                    ox: 0.5, oy: 1, offsetX: NE_OFFSET_X,
+                    offsetY: -(level * WALL_HEIGHT) + NE_OFFSET_Y, scale: 1,
                 });
                 if (deco) (deco as any)._isoDepth = depth;
             }
@@ -313,12 +372,9 @@ export default class BedroomWorld extends BaseWorld {
             for (let level = 0; level < LEVELS; level++) {
                 const depth = getIsoDepth(0, ty, level) + 0.5;
                 const deco = this.placeWallDeco({
-                    tx: 0, ty,
-                    texture: 'wall_nw',
-                    ox: 0.5, oy: 1,
-                    offsetX: NW_OFFSET_X,
-                    offsetY: -(level * WALL_HEIGHT) + NW_OFFSET_Y,
-                    scale: 1,
+                    tx: 0, ty, texture: 'wall_nw',
+                    ox: 0.5, oy: 1, offsetX: NW_OFFSET_X,
+                    offsetY: -(level * WALL_HEIGHT) + NW_OFFSET_Y, scale: 1,
                 });
                 if (deco) (deco as any)._isoDepth = depth;
             }
@@ -334,7 +390,6 @@ export default class BedroomWorld extends BaseWorld {
             tile.worldY + (config.offsetY ?? 0),
             config.texture,
         );
-
         obj.setOrigin(config.ox ?? 0.5, config.oy ?? 1);
         if (config.scale !== undefined) obj.setScale(config.scale);
         (obj as any)._isWall = true;

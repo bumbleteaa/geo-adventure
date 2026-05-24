@@ -8,14 +8,14 @@ const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     width: window.innerWidth,
     height: window.innerHeight,
-    parent: 'game-container', // Pastikan ada <div id="game-container"> di index.html
-    pixelArt: true,           // WAJIB: Biar aset 32px lo tetep tajam, gak blur
-    backgroundColor: '#6990b8', // Langit malam Deep Purple
+    parent: 'game-container',
+    pixelArt: true,
+    backgroundColor: '#6990b8',
     scale: {
-        mode: Phaser.Scale.RESIZE, // Biar pas di semua ukuran layar HP
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [MainMenu, BedroomWorld, HomeWorld, ClassroomWorld], // Kita masukin MeadowWorld sebagai scene pertama
+    scene: [BedroomWorld, HomeWorld],
     physics: {
         default: 'arcade',
         arcade: {
