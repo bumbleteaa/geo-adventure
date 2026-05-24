@@ -122,7 +122,10 @@ export default class ClassroomWorld extends BaseWorld {
         this.dialogUI = new DialogUI();
         this.questionUI = new QuestionUI();
         this.dialogManager = new DialogManager(this.dialogUI, this.questionUI);
-        this.dialogManager.init('ClassroomWorld', ['pak_guru']);
+        this.dialogManager.init('ClassroomWorld', ['classroom_q']).then(() => {
+            if (!this.scene.isActive('ClassroomWorld')) return;
+            this.spawnQuestionIndicators();
+        });
 
         this.triggerSystem = new TileTriggerSystem(
             this.grid,
